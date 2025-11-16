@@ -4,6 +4,7 @@ interface TimelineEvent {
   name: string;
   startDate: Date;
   endDate: Date | null;
+  color: string;
 }
 
 class Timeline {
@@ -20,6 +21,30 @@ class Timeline {
   // Timeline spans 12 months from today
   private timelineStart: Date;
   private timelineEnd: Date;
+
+  // Color palette
+  private readonly colorPalette = [
+    '#017EFE', // Blue (default)
+    '#FF4757', // Red
+    '#2ED573', // Green
+    '#FFA502', // Orange
+    '#9B59B6', // Purple
+    '#1ABC9C', // Turquoise
+    '#F1C40F', // Yellow
+    '#E84393', // Pink
+    '#00D2D3', // Cyan
+    '#5F27CD', // Deep Purple
+    '#FF6348', // Coral
+    '#48DBFB', // Sky Blue
+    '#FF9FF3', // Light Pink
+    '#54A0FF', // Light Blue
+    '#00D8D6', // Aqua
+    '#FFA801', // Amber
+    '#01A3A4', // Teal
+    '#EE5A6F', // Rose
+    '#C44569', // Magenta
+    '#786FA6', // Lavender
+  ];
 
   constructor() {
     this.eventsContainer = document.getElementById('timeline-events') as HTMLElement;
@@ -73,7 +98,8 @@ class Timeline {
       id: this.nextId++,
       name: `Event ${this.nextId - 1}`,
       startDate: start,
-      endDate: end
+      endDate: end,
+      color: this.colorPalette[0] // Default blue
     };
 
     this.events.push(event);
@@ -95,6 +121,10 @@ class Timeline {
 
     const eventEl = document.createElement('div');
     eventEl.className = 'timeline-event';
+    eventEl.dataset.color = event.color;
+
+    // Apply color to event
+    this.applyEventColor(eventEl, event.color);
 
     // Mark as open-ended if no end date
     if (event.endDate === null) {
@@ -149,6 +179,33 @@ class Timeline {
       this.toggleEndDate(event.id);
     });
 
+    // Color picker button
+    const colorBtn = document.createElement('button');
+    colorBtn.className = 'color-button';
+    colorBtn.textContent = '🎨';
+    colorBtn.title = 'Change Color';
+    colorBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleColorPicker(event.id);
+    });
+
+    // Color picker dropdown
+    const colorPicker = document.createElement('div');
+    colorPicker.className = 'color-picker';
+    this.colorPalette.forEach(color => {
+      const colorOption = document.createElement('div');
+      colorOption.className = 'color-option';
+      colorOption.style.backgroundColor = color;
+      if (color === event.color) {
+        colorOption.classList.add('selected');
+      }
+      colorOption.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.changeEventColor(event.id, color);
+      });
+      colorPicker.appendChild(colorOption);
+    });
+
     // Delete button (outside the event)
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete-button';
@@ -160,6 +217,8 @@ class Timeline {
 
     wrapper.appendChild(externalDatesEl);
     wrapper.appendChild(eventEl);
+    wrapper.appendChild(colorPicker);
+    wrapper.appendChild(colorBtn);
     wrapper.appendChild(clearEndBtn);
     wrapper.appendChild(deleteBtn);
 
@@ -489,6 +548,83 @@ class Timeline {
     this.saveEvents();
   }
 
+  private applyEventColor(eventEl: HTMLElement, color: string) {
+    const rgb = this.hexToRgb(color);
+    if (!rgb) return;
+
+    eventEl.style.setProperty('--event-color-r', rgb.r.toString());
+    eventEl.style.setProperty('--event-color-g', rgb.g.toString());
+    eventEl.style.setProperty('--event-color-b', rgb.b.toString());
+  }
+
+  private hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
+  }
+
+  private toggleColorPicker(id: number) {
+    const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
+    const colorPicker = wrapper?.querySelector('.color-picker') as HTMLElement;
+
+    if (!colorPicker) return;
+
+    // Close all other color pickers
+    document.querySelectorAll('.color-picker.show').forEach(picker => {
+      if (picker !== colorPicker) {
+        picker.classList.remove('show');
+      }
+    });
+
+    colorPicker.classList.toggle('show');
+  }
+
+  private changeEventColor(id: number, color: string) {
+    const event = this.events.find(e => e.id === id);
+    if (!event) return;
+
+    event.color = color;
+
+    const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
+    const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
+    const colorPicker = wrapper?.querySelector('.color-picker') as HTMLElement;
+
+    if (eventEl) {
+      eventEl.dataset.color = color;
+      this.applyEventColor(eventEl, color);
+    }
+
+    // Update selected color option
+    if (colorPicker) {
+      colorPicker.querySelectorAll('.color-option').forEach(option => {
+        const optionEl = option as HTMLElement;
+        if (optionEl.style.backgroundColor === color || this.rgbToHex(optionEl.style.backgroundColor) === color) {
+          optionEl.classList.add('selected');
+        } else {
+          optionEl.classList.remove('selected');
+        }
+      });
+      colorPicker.classList.remove('show');
+    }
+
+    this.saveEvents();
+  }
+
+  private rgbToHex(rgb: string): string {
+    const result = rgb.match(/\d+/g);
+    if (!result || result.length < 3) return '';
+    const r = parseInt(result[0]);
+    const g = parseInt(result[1]);
+    const b = parseInt(result[2]);
+    return '#' + [r, g, b].map(x => {
+      const hex = x.toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    }).join('').toUpperCase();
+  }
+
   private handleReorderMove(e: MouseEvent) {
     if (!this.draggedEvent) return;
 
@@ -554,6 +690,13 @@ class Timeline {
   private handleDocumentClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
 
+    // Close color pickers if clicking outside
+    if (!target.closest('.color-picker') && !target.closest('.color-button')) {
+      document.querySelectorAll('.color-picker.show').forEach(picker => {
+        picker.classList.remove('show');
+      });
+    }
+
     // Check if click is outside timeline events
     if (!target.closest('.timeline-event-wrapper')) {
       if (this.selectedEventId !== null) {
@@ -569,7 +712,8 @@ class Timeline {
       id: event.id,
       name: event.name,
       startDate: event.startDate.toISOString(),
-      endDate: event.endDate ? event.endDate.toISOString() : null
+      endDate: event.endDate ? event.endDate.toISOString() : null,
+      color: event.color
     }));
     localStorage.setItem('timelineEvents', JSON.stringify(eventsData));
     localStorage.setItem('timelineNextId', this.nextId.toString());
@@ -590,7 +734,8 @@ class Timeline {
           id: data.id,
           name: data.name,
           startDate: new Date(data.startDate),
-          endDate: data.endDate ? new Date(data.endDate) : null
+          endDate: data.endDate ? new Date(data.endDate) : null,
+          color: data.color || this.colorPalette[0] // Default to blue if no color
         }));
 
         // Render all loaded events
@@ -606,7 +751,8 @@ class Timeline {
       id: event.id,
       name: event.name,
       startDate: event.startDate.toISOString(),
-      endDate: event.endDate ? event.endDate.toISOString() : null
+      endDate: event.endDate ? event.endDate.toISOString() : null,
+      color: event.color
     }));
 
     const dataStr = JSON.stringify(eventsData, null, 2);
@@ -646,7 +792,8 @@ class Timeline {
               id: data.id,
               name: data.name,
               startDate: new Date(data.startDate),
-              endDate: data.endDate ? new Date(data.endDate) : null
+              endDate: data.endDate ? new Date(data.endDate) : null,
+              color: data.color || this.colorPalette[0]
             };
             this.events.push(event);
             this.renderEvent(event);

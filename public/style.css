@@ -177,8 +177,8 @@ button:hover {
 .timeline-event {
     position: relative;
     height: 45px;
-    background-color: rgba(1, 126, 254, 0.3);
-    border: 2px solid rgba(1, 126, 254, 0.8);
+    background-color: rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.3);
+    border: 2px solid rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.8);
     border-radius: 8px;
     display: flex;
     align-items: center;
@@ -200,29 +200,29 @@ button:hover {
 
 .timeline-event.open-ended {
     background: linear-gradient(to right,
-        rgba(1, 126, 254, 0.3) 0%,
-        rgba(1, 126, 254, 0.3) 70%,
-        rgba(1, 126, 254, 0.1) 90%,
-        rgba(1, 126, 254, 0) 100%);
-    border-right: 2px dashed rgba(1, 126, 254, 0.5);
+        rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.3) 0%,
+        rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.3) 70%,
+        rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.1) 90%,
+        rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0) 100%);
+    border-right: 2px dashed rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.5);
 }
 
 .timeline-event.open-ended:hover {
     background: linear-gradient(to right,
-        rgba(1, 126, 254, 0.5) 0%,
-        rgba(1, 126, 254, 0.5) 70%,
-        rgba(1, 126, 254, 0.2) 90%,
-        rgba(1, 126, 254, 0) 100%);
+        rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.5) 0%,
+        rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.5) 70%,
+        rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.2) 90%,
+        rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0) 100%);
 }
 
 .timeline-event:hover {
-    background-color: rgba(1, 126, 254, 0.5);
+    background-color: rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.5);
 }
 
 .timeline-event-wrapper.selected .timeline-event {
-    border-color: rgba(1, 197, 245, 1);
-    background-color: rgba(1, 126, 254, 0.5);
-    box-shadow: 0 0 10px rgba(1, 197, 245, 0.5);
+    border-color: rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 1);
+    background-color: rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.5);
+    box-shadow: 0 0 10px rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.5);
 }
 
 .timeline-event.dragging {
@@ -333,6 +333,67 @@ button:hover {
 
 .clear-end-button:hover {
     background-color: rgba(1, 126, 254, 0.6);
+}
+
+.color-button {
+    padding: 4px 8px;
+    font-size: 16px;
+    background-color: rgba(128, 128, 128, 0.3);
+    border-color: rgba(128, 128, 128, 0.8);
+    min-width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: none;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.timeline-event-wrapper.selected .color-button {
+    display: block;
+}
+
+.color-button:hover {
+    background-color: rgba(128, 128, 128, 0.6);
+}
+
+.color-picker {
+    position: absolute;
+    top: 50%;
+    right: -10px;
+    transform: translateY(-50%) translateX(100%);
+    background-color: rgba(25, 25, 28, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    padding: 10px;
+    display: none;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    z-index: 1001;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.color-picker.show {
+    display: grid;
+}
+
+.color-option {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.color-option:hover {
+    transform: scale(1.1);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.color-option.selected {
+    border-color: rgba(255, 255, 255, 1);
+    border-width: 3px;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
 @media (max-width: 875px) {
