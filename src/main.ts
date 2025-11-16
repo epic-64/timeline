@@ -243,14 +243,17 @@ class Timeline {
     // Make editable only when clicked
     nameEl.addEventListener('click', (e) => {
       e.stopPropagation();
-      nameEl.contentEditable = 'true';
-      nameEl.focus();
-      // Select all text for easy editing
-      const range = document.createRange();
-      range.selectNodeContents(nameEl);
-      const sel = window.getSelection();
-      sel?.removeAllRanges();
-      sel?.addRange(range);
+      if (nameEl.contentEditable === 'false') {
+        nameEl.contentEditable = 'true';
+        nameEl.focus();
+        // Move cursor to the end
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(nameEl);
+        range.collapse(false); // false = collapse to end
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
     });
 
     nameEl.addEventListener('blur', (e) => {
