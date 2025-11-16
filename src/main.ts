@@ -174,6 +174,22 @@ class Timeline {
     return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
   }
 
+  private snapToStartOfMonth(date: Date): Date {
+    const snapped = new Date(date);
+    snapped.setDate(1);
+    snapped.setHours(0, 0, 0, 0);
+    return snapped;
+  }
+
+  private snapToEndOfMonth(date: Date): Date {
+    const snapped = new Date(date);
+    // Go to next month, then back one day
+    snapped.setMonth(snapped.getMonth() + 1);
+    snapped.setDate(0);
+    snapped.setHours(23, 59, 59, 999);
+    return snapped;
+  }
+
   private startMove(e: MouseEvent, id: number) {
     const target = e.target as HTMLElement;
 
@@ -239,6 +255,34 @@ class Timeline {
 
   private handleMouseUp() {
     if (this.draggedEvent) {
+      const event = this.events.find(ev => ev.id === this.draggedEvent!.id);
+
+      if (event) {
+        // Apply snapping based on drag type
+        if (this.draggedEvent.type === 'resize-left' || this.draggedEvent.type === 'move') {
+          // Snap start date to beginning of month
+          event.startDate = this.snapToStartOfMonth(event.startDate);
+        }
+
+        if (this.draggedEvent.type === 'resize-right' || this.draggedEvent.type === 'move') {
+          // Snap end date to end of month
+          event.endDate = this.snapToEndOfMonth(event.endDate);
+        }
+
+        // Ensure start is before end after snapping
+        if (event.startDate >= event.endDate) {
+          // If snapping caused overlap, adjust end date to end of start date's month
+          event.endDate = this.snapToEndOfMonth(event.startDate);
+        }
+
+        // Update the visual position after snapping
+        const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
+        const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
+        if (wrapper && eventEl) {
+          this.updateEventPosition(wrapper, eventEl, event);
+        }
+      }
+
       const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
       const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
       eventEl?.classList.remove('dragging');
