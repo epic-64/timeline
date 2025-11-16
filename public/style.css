@@ -147,6 +147,25 @@ button:hover {
     gap: 10px;
 }
 
+.timeline-event-dates-external {
+    position: absolute;
+    right: calc(100% - var(--event-left, 0%));
+    margin-right: 10px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+    display: none;
+}
+
+.timeline-event-wrapper.short-event .timeline-event-dates-external {
+    display: block;
+}
+
+.timeline-event-wrapper.short-event .timeline-event-dates {
+    display: none;
+}
+
 .timeline-event {
     position: relative;
     height: 45px;

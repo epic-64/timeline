@@ -86,6 +86,11 @@ class Timeline {
     wrapper.className = 'timeline-event-wrapper';
     wrapper.dataset.id = event.id.toString();
 
+    // External date label (for short events)
+    const externalDatesEl = document.createElement('span');
+    externalDatesEl.className = 'timeline-event-dates-external';
+    externalDatesEl.textContent = this.formatDateRange(event.startDate, event.endDate);
+
     const eventEl = document.createElement('div');
     eventEl.className = 'timeline-event';
 
@@ -93,8 +98,6 @@ class Timeline {
     if (event.endDate === null) {
       eventEl.classList.add('open-ended');
     }
-
-    this.updateEventPosition(wrapper, eventEl, event);
 
     const content = document.createElement('div');
     content.className = 'timeline-event-content';
@@ -153,6 +156,7 @@ class Timeline {
       this.deleteEvent(event.id);
     });
 
+    wrapper.appendChild(externalDatesEl);
     wrapper.appendChild(eventEl);
     wrapper.appendChild(clearEndBtn);
     wrapper.appendChild(deleteBtn);
@@ -167,9 +171,12 @@ class Timeline {
     content.addEventListener('mousedown', (e) => this.startMove(e, event.id));
 
     this.eventsContainer.appendChild(wrapper);
+
+    // Now update position after wrapper is in DOM
+    this.updateEventPosition(wrapper, eventEl, event);
   }
 
-  private updateEventPosition(_wrapper: HTMLElement, eventEl: HTMLElement, event: TimelineEvent) {
+  private updateEventPosition(wrapper: HTMLElement, eventEl: HTMLElement, event: TimelineEvent) {
     const timelineSpan = this.timelineEnd.getTime() - this.timelineStart.getTime();
 
     const startOffset = event.startDate.getTime() - this.timelineStart.getTime();
@@ -183,6 +190,14 @@ class Timeline {
     eventEl.style.width = `${Math.max(widthPercent, 5)}%`;
     eventEl.style.marginLeft = `${Math.max(leftPercent, 0)}%`;
 
+    // Set CSS variable for external date positioning
+    wrapper.style.setProperty('--event-left', `${Math.max(leftPercent, 0)}%`);
+
+    // Determine if event is short (less than 2 years)
+    const eventDuration = effectiveEndDate.getTime() - event.startDate.getTime();
+    const twoYearsInMs = 2 * 365.25 * 24 * 60 * 60 * 1000;
+    const isShortEvent = eventDuration < twoYearsInMs;
+
     // Update or add open-ended class
     if (event.endDate === null) {
       eventEl.classList.add('open-ended');
@@ -190,10 +205,23 @@ class Timeline {
       eventEl.classList.remove('open-ended');
     }
 
-    // Update date display
+    // Toggle short-event class and date display
+    if (isShortEvent) {
+      wrapper.classList.add('short-event');
+    } else {
+      wrapper.classList.remove('short-event');
+    }
+
+    // Update both date displays
     const datesEl = eventEl.querySelector('.timeline-event-dates');
+    const externalDatesEl = wrapper.querySelector('.timeline-event-dates-external');
+    const dateText = this.formatDateRange(event.startDate, event.endDate);
+
     if (datesEl) {
-      datesEl.textContent = this.formatDateRange(event.startDate, event.endDate);
+      datesEl.textContent = dateText;
+    }
+    if (externalDatesEl) {
+      externalDatesEl.textContent = dateText;
     }
   }
 
