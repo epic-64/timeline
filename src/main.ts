@@ -14,9 +14,7 @@ class Timeline {
   private datesContainer: HTMLElement;
   private draggedEvent: { id: number; type: 'move' | 'resize-left' | 'resize-right' } | null = null;
   private dragStartX = 0;
-  private dragStartY = 0;
   private selectedEventId: number | null = null;
-  private isDraggingVertically = false;
 
   // Timeline spans 12 months from today
   private timelineStart: Date;
@@ -331,8 +329,8 @@ class Timeline {
       this.selectEvent(event.id);
     });
 
-    // Drag to move (both horizontal and vertical)
-    content.addEventListener('mousedown', (e) => this.startMove(e, event.id));
+    // Drag to reorder vertically only
+    content.addEventListener('mousedown', (e) => this.startVerticalReorder(e, event.id));
 
     this.eventsContainer.appendChild(wrapper);
 
@@ -454,7 +452,7 @@ class Timeline {
     return snapped;
   }
 
-  private startMove(e: MouseEvent, id: number) {
+  private startVerticalReorder(e: MouseEvent, id: number) {
     const target = e.target as HTMLElement;
 
     // Don't start move if clicking on editable name or button
@@ -467,12 +465,10 @@ class Timeline {
 
     this.draggedEvent = { id, type: 'move' };
     this.dragStartX = e.clientX;
-    this.dragStartY = e.clientY;
-    this.isDraggingVertically = false;
 
     const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
     const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
-    eventEl?.classList.add('dragging');
+    eventEl?.classList.add('reordering');
   }
 
   private startResize(e: MouseEvent, id: number, type: 'resize-left' | 'resize-right') {
@@ -486,34 +482,23 @@ class Timeline {
   private handleMouseMove(e: MouseEvent) {
     if (!this.draggedEvent) return;
 
-    const deltaX = e.clientX - this.dragStartX;
-    const deltaY = e.clientY - this.dragStartY;
-
-    // Determine drag direction based on initial movement
-    if (!this.isDraggingVertically && this.draggedEvent.type === 'move') {
-      // If moved more than 5 pixels, determine direction
-      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-        this.isDraggingVertically = Math.abs(deltaY) > Math.abs(deltaX);
-      }
-    }
-
-    // Handle vertical reordering
-    if (this.isDraggingVertically && this.draggedEvent.type === 'move') {
+    // Handle vertical reordering for move type
+    if (this.draggedEvent.type === 'move') {
       this.handleReorderMove(e);
       return;
     }
 
-    // Handle horizontal timeline dragging (resize or horizontal move)
+    // Handle horizontal timeline dragging (resize only)
     const event = this.events.find(ev => ev.id === this.draggedEvent!.id);
     if (!event) return;
 
+    const deltaX = e.clientX - this.dragStartX;
     const containerWidth = this.eventsContainer.offsetWidth;
 
     // Calculate current zoomed position and new zoomed position
     const currentZoomedPos = this.timeToZoomedPosition(
       this.draggedEvent.type === 'resize-left' ? event.startDate.getTime() :
-      this.draggedEvent.type === 'resize-right' && event.endDate ? event.endDate.getTime() :
-      event.startDate.getTime()
+      event.endDate ? event.endDate.getTime() : event.startDate.getTime()
     );
 
     const deltaZoomedPos = deltaX / containerWidth;
@@ -522,17 +507,7 @@ class Timeline {
     // Convert back to timestamp
     const newTimestamp = this.zoomedPositionToTime(newZoomedPos);
 
-    if (this.draggedEvent.type === 'move') {
-      // Only move if event has an end date
-      if (event.endDate !== null) {
-        const duration = event.endDate.getTime() - event.startDate.getTime();
-        event.startDate = new Date(newTimestamp);
-        event.endDate = new Date(newTimestamp + duration);
-      } else {
-        // For open-ended events, only move the start date
-        event.startDate = new Date(newTimestamp);
-      }
-    } else if (this.draggedEvent.type === 'resize-left') {
+    if (this.draggedEvent.type === 'resize-left') {
       const newStart = new Date(newTimestamp);
       const compareDate = event.endDate || new Date();
       if (newStart < compareDate) {
@@ -561,7 +536,7 @@ class Timeline {
     if (!this.draggedEvent) return;
 
     // Handle vertical reordering completion
-    if (this.isDraggingVertically && this.draggedEvent.type === 'move') {
+    if (this.draggedEvent.type === 'move') {
       this.handleReorderEnd();
 
       const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
@@ -570,21 +545,20 @@ class Timeline {
       eventEl?.classList.remove('reordering');
 
       this.draggedEvent = null;
-      this.isDraggingVertically = false;
       return;
     }
 
-    // Handle horizontal timeline dragging completion
+    // Handle horizontal timeline dragging completion (resize only)
     const event = this.events.find(ev => ev.id === this.draggedEvent!.id);
 
     if (event) {
-      // Apply snapping based on drag type
-      if (this.draggedEvent.type === 'resize-left' || this.draggedEvent.type === 'move') {
+      // Apply snapping based on resize type
+      if (this.draggedEvent.type === 'resize-left') {
         // Snap start date to beginning of month
         event.startDate = this.snapToStartOfMonth(event.startDate);
       }
 
-      if (event.endDate !== null && (this.draggedEvent.type === 'resize-right' || this.draggedEvent.type === 'move')) {
+      if (this.draggedEvent.type === 'resize-right' && event.endDate !== null) {
         // Snap end date to end of month (only if end date exists)
         event.endDate = this.snapToEndOfMonth(event.endDate);
       }
@@ -607,7 +581,6 @@ class Timeline {
     const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
     eventEl?.classList.remove('dragging');
     this.draggedEvent = null;
-    this.isDraggingVertically = false;
     this.saveEvents();
   }
 
