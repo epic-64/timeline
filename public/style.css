@@ -149,6 +149,7 @@ button:hover {
 
 .timeline-event-dates-external {
     position: absolute;
+    /*noinspection CssUnresolvedCustomProperty*/
     right: calc(100% - var(--event-left, 0%));
     margin-right: 10px;
     font-family: "JetBrains Mono", monospace;
@@ -156,6 +157,13 @@ button:hover {
     color: rgba(255, 255, 255, 0.7);
     white-space: nowrap;
     display: none;
+    line-height: 1.3;
+}
+
+.timeline-event-dates-external .duration {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
 }
 
 .timeline-event-wrapper.short-event .timeline-event-dates-external {
@@ -251,6 +259,13 @@ button:hover {
 .timeline-event-dates {
     font-size: 11px;
     color: rgba(255, 255, 255, 0.8);
+    line-height: 1.3;
+}
+
+.timeline-event-dates .duration {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    font-style: italic;
 }
 
 .timeline-event-handle {

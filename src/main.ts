@@ -89,7 +89,9 @@ class Timeline {
     // External date label (for short events)
     const externalDatesEl = document.createElement('span');
     externalDatesEl.className = 'timeline-event-dates-external';
-    externalDatesEl.textContent = this.formatDateRange(event.startDate, event.endDate);
+    const dateRangeText = this.formatDateRange(event.startDate, event.endDate);
+    const durationText = this.calculateDuration(event.startDate, event.endDate);
+    externalDatesEl.innerHTML = `${dateRangeText}<br><span class="duration">${durationText}</span>`;
 
     const eventEl = document.createElement('div');
     eventEl.className = 'timeline-event';
@@ -119,7 +121,7 @@ class Timeline {
 
     const datesEl = document.createElement('span');
     datesEl.className = 'timeline-event-dates';
-    datesEl.textContent = this.formatDateRange(event.startDate, event.endDate);
+    datesEl.innerHTML = `${dateRangeText}<br><span class="duration">${durationText}</span>`;
 
     content.appendChild(nameEl);
     content.appendChild(datesEl);
@@ -216,12 +218,14 @@ class Timeline {
     const datesEl = eventEl.querySelector('.timeline-event-dates');
     const externalDatesEl = wrapper.querySelector('.timeline-event-dates-external');
     const dateText = this.formatDateRange(event.startDate, event.endDate);
+    const durationText = this.calculateDuration(event.startDate, event.endDate);
+    const fullText = `${dateText}<br><span class="duration">${durationText}</span>`;
 
     if (datesEl) {
-      datesEl.textContent = dateText;
+      datesEl.innerHTML = fullText;
     }
     if (externalDatesEl) {
-      externalDatesEl.textContent = dateText;
+      externalDatesEl.innerHTML = fullText;
     }
   }
 
@@ -232,6 +236,44 @@ class Timeline {
     }
     const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     return `${startStr} - ${endStr}`;
+  }
+
+  private calculateDuration(start: Date, end: Date | null): string {
+    const effectiveEnd = end || new Date();
+
+    // Calculate difference in months
+    let years = effectiveEnd.getFullYear() - start.getFullYear();
+    let months = effectiveEnd.getMonth() - start.getMonth();
+
+    // Adjust for negative months
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    // Adjust for day of month
+    if (effectiveEnd.getDate() < start.getDate()) {
+      months--;
+      if (months < 0) {
+        years--;
+        months += 12;
+      }
+    }
+
+    // Format the output
+    const parts: string[] = [];
+    if (years > 0) {
+      parts.push(`${years} ${years === 1 ? 'year' : 'years'}`);
+    }
+    if (months > 0) {
+      parts.push(`${months} ${months === 1 ? 'month' : 'months'}`);
+    }
+
+    if (parts.length === 0) {
+      return 'Less than 1 month';
+    }
+
+    return parts.join(', ');
   }
 
   private snapToStartOfMonth(date: Date): Date {
