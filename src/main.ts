@@ -1,4 +1,6 @@
 //TIP With Search Everywhere, you can find any action, file, or symbol in your project. Press <shortcut actionId="Shift"/> <shortcut actionId="Shift"/>, type in <b>terminal</b>, and press <shortcut actionId="EditorEnter"/>. Then run <shortcut raw="npm run dev"/> in the terminal and click the link in its output to open the app in the browser.
+import html2canvas from 'html2canvas';
+
 interface TimelineEvent {
   id: number;
   name: string;
@@ -69,6 +71,7 @@ class Timeline {
     document.getElementById('addEvent')?.addEventListener('click', () => this.addEvent());
     document.getElementById('exportEvents')?.addEventListener('click', () => this.exportEvents());
     document.getElementById('importEvents')?.addEventListener('click', () => this.importEvents());
+    document.getElementById('downloadImage')?.addEventListener('click', () => this.downloadAsImage());
 
     document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
     document.addEventListener('mouseup', () => this.handleMouseUp());
@@ -945,6 +948,72 @@ class Timeline {
     };
 
     input.click();
+  }
+
+  private async downloadAsImage() {
+    const timelineContainer = document.querySelector('.timeline-container') as HTMLElement;
+    if (!timelineContainer) {
+      alert('Timeline not found!');
+      return;
+    }
+
+    try {
+      // Hide UI elements that shouldn't be in the image
+      const elementsToHide = timelineContainer.querySelectorAll(
+        '.delete-button, .color-button, .clear-end-button, .color-picker, .timeline-event-handle'
+      );
+      elementsToHide.forEach(el => (el as HTMLElement).style.display = 'none');
+
+      // Remove selected state temporarily
+      const selectedElements = timelineContainer.querySelectorAll('.selected');
+      selectedElements.forEach(el => el.classList.remove('selected'));
+
+      // Capture the timeline
+      const canvas = await html2canvas(timelineContainer, {
+        backgroundColor: '#000000',
+        scale: 2, // Higher resolution
+        logging: false,
+        useCORS: true
+      });
+
+      // Restore hidden elements
+      elementsToHide.forEach(el => (el as HTMLElement).style.display = '');
+
+      // Restore selected state
+      if (this.selectedEventId !== null) {
+        const wrapper = this.eventsContainer.querySelector(`[data-id="${this.selectedEventId}"]`);
+        wrapper?.classList.add('selected');
+      }
+
+      // Convert canvas to blob and download
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `timeline-${new Date().toISOString().split('T')[0]}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }
+      }, 'image/png');
+    } catch (error) {
+      console.error('Failed to download image:', error);
+      alert('Failed to download image. Please try again.');
+
+      // Restore hidden elements in case of error
+      const elementsToHide = timelineContainer.querySelectorAll(
+        '.delete-button, .color-button, .clear-end-button, .color-picker, .timeline-event-handle'
+      );
+      elementsToHide.forEach(el => (el as HTMLElement).style.display = '');
+
+      // Restore selected state
+      if (this.selectedEventId !== null) {
+        const wrapper = this.eventsContainer.querySelector(`[data-id="${this.selectedEventId}"]`);
+        wrapper?.classList.add('selected');
+      }
+    }
   }
 }
 
