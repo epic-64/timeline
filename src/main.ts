@@ -27,25 +27,25 @@ class Timeline {
   // Color palette
   private readonly colorPalette = [
     '#017EFE', // Blue (default)
-    '#FF4757', // Red
-    '#2ED573', // Green
-    '#FFA502', // Orange
-    '#9B59B6', // Purple
-    '#1ABC9C', // Turquoise
-    '#F1C40F', // Yellow
-    '#E84393', // Pink
-    '#00D2D3', // Cyan
-    '#5F27CD', // Deep Purple
-    '#FF6348', // Coral
-    '#48DBFB', // Sky Blue
-    '#FF9FF3', // Light Pink
-    '#54A0FF', // Light Blue
-    '#00D8D6', // Aqua
-    '#FFA801', // Amber
-    '#01A3A4', // Teal
-    '#EE5A6F', // Rose
-    '#C44569', // Magenta
-    '#786FA6', // Lavender
+    '#1b81f0', // Red
+    '#41b3ff', // Green
+    '#1ff2ff', // Orange
+    '#1dfa6c', // Purple
+    '#5dd334', // Turquoise
+    '#f9fd2c', // Yellow
+    '#ffc223', // Pink
+    '#ff7f2d', // Cyan
+    '#ff1010', // Deep Purple
+    '#ff32c8', // Coral
+    '#d923ff', // Sky Blue
+    '#8624ff', // Light Pink
+    '#5224ff', // Light Blue
+    '#1b04d5', // Aqua
+    '#018e2c', // Amber
+    '#a3af02', // Teal
+    '#ab2103', // Rose
+    '#a90152', // Magenta
+    '#979797', // Lavender
   ];
 
   constructor() {
