@@ -83,6 +83,10 @@ button:hover {
 /* Timeline Styles */
 .controls {
     margin-bottom: 30px;
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
 }
 
 .timeline-container {

@@ -30,10 +30,13 @@ class Timeline {
 
     this.setupEventListeners();
     this.renderDateHeader();
+    this.loadEvents();
   }
 
   private setupEventListeners() {
     document.getElementById('addEvent')?.addEventListener('click', () => this.addEvent());
+    document.getElementById('exportEvents')?.addEventListener('click', () => this.exportEvents());
+    document.getElementById('importEvents')?.addEventListener('click', () => this.importEvents());
 
     document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
     document.addEventListener('mouseup', () => this.handleMouseUp());
@@ -73,6 +76,7 @@ class Timeline {
 
     this.events.push(event);
     this.renderEvent(event);
+    this.saveEvents();
   }
 
   private renderEvent(event: TimelineEvent) {
@@ -94,6 +98,7 @@ class Timeline {
     nameEl.contentEditable = 'true';
     nameEl.addEventListener('blur', (e) => {
       event.name = (e.target as HTMLElement).textContent || event.name;
+      this.saveEvents();
     });
     nameEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -238,6 +243,7 @@ class Timeline {
       const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
       eventEl?.classList.remove('dragging');
       this.draggedEvent = null;
+      this.saveEvents();
     }
   }
 
@@ -248,6 +254,7 @@ class Timeline {
     if (this.selectedEventId === id) {
       this.selectedEventId = null;
     }
+    this.saveEvents();
   }
 
   private selectEvent(id: number) {
@@ -274,6 +281,111 @@ class Timeline {
         this.selectedEventId = null;
       }
     }
+  }
+
+  private saveEvents() {
+    const eventsData = this.events.map(event => ({
+      id: event.id,
+      name: event.name,
+      startDate: event.startDate.toISOString(),
+      endDate: event.endDate.toISOString()
+    }));
+    localStorage.setItem('timelineEvents', JSON.stringify(eventsData));
+    localStorage.setItem('timelineNextId', this.nextId.toString());
+  }
+
+  private loadEvents() {
+    const storedEvents = localStorage.getItem('timelineEvents');
+    const storedNextId = localStorage.getItem('timelineNextId');
+
+    if (storedNextId) {
+      this.nextId = parseInt(storedNextId, 10);
+    }
+
+    if (storedEvents) {
+      try {
+        const eventsData = JSON.parse(storedEvents);
+        this.events = eventsData.map((data: any) => ({
+          id: data.id,
+          name: data.name,
+          startDate: new Date(data.startDate),
+          endDate: new Date(data.endDate)
+        }));
+
+        // Render all loaded events
+        this.events.forEach(event => this.renderEvent(event));
+      } catch (error) {
+        console.error('Failed to load events from localStorage:', error);
+      }
+    }
+  }
+
+  private exportEvents() {
+    const eventsData = this.events.map(event => ({
+      id: event.id,
+      name: event.name,
+      startDate: event.startDate.toISOString(),
+      endDate: event.endDate.toISOString()
+    }));
+
+    const dataStr = JSON.stringify(eventsData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `timeline-events-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  private importEvents() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const eventsData = JSON.parse(event.target?.result as string);
+
+          // Clear existing events
+          this.eventsContainer.innerHTML = '';
+          this.events = [];
+
+          // Import new events
+          eventsData.forEach((data: any) => {
+            const event: TimelineEvent = {
+              id: data.id,
+              name: data.name,
+              startDate: new Date(data.startDate),
+              endDate: new Date(data.endDate)
+            };
+            this.events.push(event);
+            this.renderEvent(event);
+          });
+
+          // Update nextId to be higher than any imported id
+          const maxId = Math.max(...this.events.map(e => e.id), 0);
+          this.nextId = maxId + 1;
+
+          this.saveEvents();
+          alert('Events imported successfully!');
+        } catch (error) {
+          console.error('Failed to import events:', error);
+          alert('Failed to import events. Please check the file format.');
+        }
+      };
+      reader.readAsText(file);
+    };
+
+    input.click();
   }
 }
 
