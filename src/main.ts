@@ -191,9 +191,15 @@ class Timeline {
   }
 
   addEvent() {
-    const start = new Date();
-    const end = new Date();
-    end.setMonth(end.getMonth() + 1);
+    // Calculate the middle of the timeline range
+    const timelineSpan = this.timelineEnd.getTime() - this.timelineStart.getTime();
+    const middleTimestamp = this.timelineStart.getTime() + (timelineSpan / 2);
+
+    const start = new Date(middleTimestamp);
+    const end = new Date(middleTimestamp);
+
+    // Add 3 years to the end date
+    end.setFullYear(end.getFullYear() + 3);
 
     const event: TimelineEvent = {
       id: this.nextId++,
