@@ -238,14 +238,35 @@ class Timeline {
     const nameEl = document.createElement('span');
     nameEl.className = 'timeline-event-name';
     nameEl.textContent = event.name;
-    nameEl.contentEditable = 'true';
+    nameEl.contentEditable = 'false';
+
+    // Make editable only when clicked
+    nameEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      nameEl.contentEditable = 'true';
+      nameEl.focus();
+      // Select all text for easy editing
+      const range = document.createRange();
+      range.selectNodeContents(nameEl);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    });
+
     nameEl.addEventListener('blur', (e) => {
+      nameEl.contentEditable = 'false';
       event.name = (e.target as HTMLElement).textContent || event.name;
       this.saveEvents();
     });
+
     nameEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
+        (e.target as HTMLElement).blur();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        nameEl.textContent = event.name; // Restore original text
         (e.target as HTMLElement).blur();
       }
     });
@@ -323,11 +344,12 @@ class Timeline {
     wrapper.appendChild(clearEndBtn);
     wrapper.appendChild(deleteBtn);
 
-    // Click to select
+    // Click to select - only when clicking on the event element itself
     eventEl.addEventListener('click', (e) => {
       e.stopPropagation();
       this.selectEvent(event.id);
     });
+
 
     // Drag to reorder vertically only
     content.addEventListener('mousedown', (e) => this.startVerticalReorder(e, event.id));
@@ -799,13 +821,11 @@ class Timeline {
       });
     }
 
-    // Check if click is outside timeline events
-    if (!target.closest('.timeline-event-wrapper')) {
-      if (this.selectedEventId !== null) {
-        const prevWrapper = this.eventsContainer.querySelector(`[data-id="${this.selectedEventId}"]`);
-        prevWrapper?.classList.remove('selected');
-        this.selectedEventId = null;
-      }
+    // Deselect if not clicking on the actual timeline event bar
+    if (!target.closest('.timeline-event') && this.selectedEventId !== null) {
+      const prevWrapper = this.eventsContainer.querySelector(`[data-id="${this.selectedEventId}"]`);
+      prevWrapper?.classList.remove('selected');
+      this.selectedEventId = null;
     }
   }
 
