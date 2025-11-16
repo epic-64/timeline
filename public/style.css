@@ -161,6 +161,23 @@ button:hover {
     transition: background-color 0.2s, border-color 0.2s;
 }
 
+.timeline-event.open-ended {
+    background: linear-gradient(to right,
+        rgba(1, 126, 254, 0.3) 0%,
+        rgba(1, 126, 254, 0.3) 70%,
+        rgba(1, 126, 254, 0.1) 90%,
+        rgba(1, 126, 254, 0) 100%);
+    border-right: 2px dashed rgba(1, 126, 254, 0.5);
+}
+
+.timeline-event.open-ended:hover {
+    background: linear-gradient(to right,
+        rgba(1, 126, 254, 0.5) 0%,
+        rgba(1, 126, 254, 0.5) 70%,
+        rgba(1, 126, 254, 0.2) 90%,
+        rgba(1, 126, 254, 0) 100%);
+}
+
 .timeline-event:hover {
     background-color: rgba(1, 126, 254, 0.5);
 }
@@ -251,6 +268,27 @@ button:hover {
 
 .delete-button:hover {
     background-color: rgba(255, 50, 50, 0.6);
+}
+
+.clear-end-button {
+    padding: 4px 8px;
+    font-size: 16px;
+    background-color: rgba(1, 126, 254, 0.3);
+    border-color: rgba(1, 126, 254, 0.8);
+    min-width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: none;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.timeline-event-wrapper.selected .clear-end-button {
+    display: block;
+}
+
+.clear-end-button:hover {
+    background-color: rgba(1, 126, 254, 0.6);
 }
 
 @media (max-width: 875px) {

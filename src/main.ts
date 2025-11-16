@@ -3,7 +3,7 @@ interface TimelineEvent {
   id: number;
   name: string;
   startDate: Date;
-  endDate: Date;
+  endDate: Date | null;
 }
 
 class Timeline {
@@ -87,6 +87,11 @@ class Timeline {
     const eventEl = document.createElement('div');
     eventEl.className = 'timeline-event';
 
+    // Mark as open-ended if no end date
+    if (event.endDate === null) {
+      eventEl.classList.add('open-ended');
+    }
+
     this.updateEventPosition(wrapper, eventEl, event);
 
     const content = document.createElement('div');
@@ -127,6 +132,16 @@ class Timeline {
     eventEl.appendChild(content);
     eventEl.appendChild(rightHandle);
 
+    // Clear end date button
+    const clearEndBtn = document.createElement('button');
+    clearEndBtn.className = 'clear-end-button';
+    clearEndBtn.textContent = event.endDate === null ? '📅' : '∞';
+    clearEndBtn.title = event.endDate === null ? 'Set End Date' : 'Clear End Date (Ongoing)';
+    clearEndBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleEndDate(event.id);
+    });
+
     // Delete button (outside the event)
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete-button';
@@ -137,6 +152,7 @@ class Timeline {
     });
 
     wrapper.appendChild(eventEl);
+    wrapper.appendChild(clearEndBtn);
     wrapper.appendChild(deleteBtn);
 
     // Click to select
@@ -155,13 +171,22 @@ class Timeline {
     const timelineSpan = this.timelineEnd.getTime() - this.timelineStart.getTime();
 
     const startOffset = event.startDate.getTime() - this.timelineStart.getTime();
-    const endOffset = event.endDate.getTime() - this.timelineStart.getTime();
+    // If no end date, use today's date for visualization
+    const effectiveEndDate = event.endDate || new Date();
+    const endOffset = effectiveEndDate.getTime() - this.timelineStart.getTime();
 
     const leftPercent = (startOffset / timelineSpan) * 100;
     const widthPercent = ((endOffset - startOffset) / timelineSpan) * 100;
 
     eventEl.style.width = `${Math.max(widthPercent, 5)}%`;
     eventEl.style.marginLeft = `${Math.max(leftPercent, 0)}%`;
+
+    // Update or add open-ended class
+    if (event.endDate === null) {
+      eventEl.classList.add('open-ended');
+    } else {
+      eventEl.classList.remove('open-ended');
+    }
 
     // Update date display
     const datesEl = eventEl.querySelector('.timeline-event-dates');
@@ -170,8 +195,13 @@ class Timeline {
     }
   }
 
-  private formatDateRange(start: Date, end: Date): string {
-    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  private formatDateRange(start: Date, end: Date | null): string {
+    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (end === null) {
+      return `${startStr} - Present`;
+    }
+    const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${startStr} - ${endStr}`;
   }
 
   private snapToStartOfMonth(date: Date): Date {
@@ -229,18 +259,28 @@ class Timeline {
     const deltaTime = (deltaX / containerWidth) * timelineSpan;
 
     if (this.draggedEvent.type === 'move') {
-      const duration = event.endDate.getTime() - event.startDate.getTime();
-      event.startDate = new Date(event.startDate.getTime() + deltaTime);
-      event.endDate = new Date(event.startDate.getTime() + duration);
+      // Only move if event has an end date
+      if (event.endDate !== null) {
+        const duration = event.endDate.getTime() - event.startDate.getTime();
+        event.startDate = new Date(event.startDate.getTime() + deltaTime);
+        event.endDate = new Date(event.startDate.getTime() + duration);
+      } else {
+        // For open-ended events, only move the start date
+        event.startDate = new Date(event.startDate.getTime() + deltaTime);
+      }
     } else if (this.draggedEvent.type === 'resize-left') {
       const newStart = new Date(event.startDate.getTime() + deltaTime);
-      if (newStart < event.endDate) {
+      const compareDate = event.endDate || new Date();
+      if (newStart < compareDate) {
         event.startDate = newStart;
       }
     } else if (this.draggedEvent.type === 'resize-right') {
-      const newEnd = new Date(event.endDate.getTime() + deltaTime);
-      if (newEnd > event.startDate) {
-        event.endDate = newEnd;
+      // Can't resize right handle if no end date
+      if (event.endDate !== null) {
+        const newEnd = new Date(event.endDate.getTime() + deltaTime);
+        if (newEnd > event.startDate) {
+          event.endDate = newEnd;
+        }
       }
     }
 
@@ -264,13 +304,13 @@ class Timeline {
           event.startDate = this.snapToStartOfMonth(event.startDate);
         }
 
-        if (this.draggedEvent.type === 'resize-right' || this.draggedEvent.type === 'move') {
-          // Snap end date to end of month
+        if (event.endDate !== null && (this.draggedEvent.type === 'resize-right' || this.draggedEvent.type === 'move')) {
+          // Snap end date to end of month (only if end date exists)
           event.endDate = this.snapToEndOfMonth(event.endDate);
         }
 
-        // Ensure start is before end after snapping
-        if (event.startDate >= event.endDate) {
+        // Ensure start is before end after snapping (only if end date exists)
+        if (event.endDate !== null && event.startDate >= event.endDate) {
           // If snapping caused overlap, adjust end date to end of start date's month
           event.endDate = this.snapToEndOfMonth(event.startDate);
         }
@@ -314,6 +354,34 @@ class Timeline {
     wrapper?.classList.add('selected');
   }
 
+  private toggleEndDate(id: number) {
+    const event = this.events.find(e => e.id === id);
+    if (!event) return;
+
+    if (event.endDate === null) {
+      // Set end date to end of current month
+      event.endDate = this.snapToEndOfMonth(new Date());
+    } else {
+      // Clear end date
+      event.endDate = null;
+    }
+
+    // Re-render the event
+    const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`);
+    if (wrapper) {
+      wrapper.remove();
+      this.renderEvent(event);
+
+      // Restore selection if it was selected
+      if (this.selectedEventId === id) {
+        const newWrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`);
+        newWrapper?.classList.add('selected');
+      }
+    }
+
+    this.saveEvents();
+  }
+
   private handleDocumentClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
 
@@ -332,7 +400,7 @@ class Timeline {
       id: event.id,
       name: event.name,
       startDate: event.startDate.toISOString(),
-      endDate: event.endDate.toISOString()
+      endDate: event.endDate ? event.endDate.toISOString() : null
     }));
     localStorage.setItem('timelineEvents', JSON.stringify(eventsData));
     localStorage.setItem('timelineNextId', this.nextId.toString());
@@ -353,7 +421,7 @@ class Timeline {
           id: data.id,
           name: data.name,
           startDate: new Date(data.startDate),
-          endDate: new Date(data.endDate)
+          endDate: data.endDate ? new Date(data.endDate) : null
         }));
 
         // Render all loaded events
@@ -369,7 +437,7 @@ class Timeline {
       id: event.id,
       name: event.name,
       startDate: event.startDate.toISOString(),
-      endDate: event.endDate.toISOString()
+      endDate: event.endDate ? event.endDate.toISOString() : null
     }));
 
     const dataStr = JSON.stringify(eventsData, null, 2);
@@ -409,7 +477,7 @@ class Timeline {
               id: data.id,
               name: data.name,
               startDate: new Date(data.startDate),
-              endDate: new Date(data.endDate)
+              endDate: data.endDate ? new Date(data.endDate) : null
             };
             this.events.push(event);
             this.renderEvent(event);
