@@ -54,11 +54,15 @@ class Timeline {
     this.eventsContainer = document.getElementById('timeline-events') as HTMLElement;
     this.datesContainer = document.getElementById('timeline-dates') as HTMLElement;
 
-    this.timelineStart = new Date(2010, 0, 1);
-    this.timelineEnd = new Date();
-    this.timelineEnd.setFullYear(this.timelineEnd.getFullYear());
+    // Load saved settings or use defaults
+    const savedStartYear = localStorage.getItem('timelineStartYear');
+    const savedEndDate = localStorage.getItem('timelineEndDate');
+
+    this.timelineStart = new Date(savedStartYear ? parseInt(savedStartYear) : 2010, 0, 1);
+    this.timelineEnd = savedEndDate ? new Date(savedEndDate) : new Date();
 
     this.setupEventListeners();
+    this.initializeInputFields();
     this.renderDateHeader();
     this.loadEvents();
   }
@@ -71,6 +75,56 @@ class Timeline {
     document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
     document.addEventListener('mouseup', () => this.handleMouseUp());
     document.addEventListener('click', (e) => this.handleDocumentClick(e));
+  }
+
+  private initializeInputFields() {
+    const startYearInput = document.getElementById('startYear') as HTMLInputElement;
+    const endDateInput = document.getElementById('endDate') as HTMLInputElement;
+
+    if (startYearInput) {
+      startYearInput.value = this.timelineStart.getFullYear().toString();
+      startYearInput.addEventListener('change', (e) => {
+        const year = parseInt((e.target as HTMLInputElement).value);
+        if (year && year >= 1900 && year <= 2100) {
+          this.timelineStart = new Date(year, 0, 1);
+          localStorage.setItem('timelineStartYear', year.toString());
+          this.refreshTimeline();
+        }
+      });
+    }
+
+    if (endDateInput) {
+      // Format date as YYYY-MM-DD for input
+      const year = this.timelineEnd.getFullYear();
+      const month = String(this.timelineEnd.getMonth() + 1).padStart(2, '0');
+      const day = String(this.timelineEnd.getDate()).padStart(2, '0');
+      endDateInput.value = `${year}-${month}-${day}`;
+
+      endDateInput.addEventListener('change', (e) => {
+        const dateStr = (e.target as HTMLInputElement).value;
+        if (dateStr) {
+          this.timelineEnd = new Date(dateStr);
+          localStorage.setItem('timelineEndDate', this.timelineEnd.toISOString());
+          this.refreshTimeline();
+        }
+      });
+    }
+  }
+
+  private refreshTimeline() {
+    // Re-render date header
+    this.renderDateHeader();
+
+    // Re-render all events with new positions
+    const wrappers = Array.from(this.eventsContainer.querySelectorAll('.timeline-event-wrapper')) as HTMLElement[];
+    wrappers.forEach(wrapper => {
+      const id = parseInt(wrapper.dataset.id || '0', 10);
+      const event = this.events.find(e => e.id === id);
+      const eventEl = wrapper.querySelector('.timeline-event') as HTMLElement;
+      if (event && eventEl) {
+        this.updateEventPosition(wrapper, eventEl, event);
+      }
+    });
   }
 
   /**

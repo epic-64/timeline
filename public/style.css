@@ -96,6 +96,47 @@ button:hover {
     gap: 10px;
     justify-content: center;
     flex-wrap: wrap;
+    align-items: center;
+}
+
+.timeline-settings {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    padding: 5px 10px;
+    background-color: rgba(25, 25, 28, 0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.timeline-settings label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-family: "JetBrains Mono", monospace;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.timeline-settings input {
+    font-family: "JetBrains Mono", monospace;
+    background-color: rgba(25, 25, 28, 0.8);
+    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 13px;
+    width: 110px;
+}
+
+.timeline-settings input[type="number"] {
+    width: 80px;
+}
+
+.timeline-settings input:focus {
+    outline: none;
+    border-color: rgba(1, 126, 254, 0.6);
+    box-shadow: 0 0 0 2px rgba(1, 126, 254, 0.2);
 }
 
 .timeline-container {
