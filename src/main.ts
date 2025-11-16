@@ -26,7 +26,7 @@ class Timeline {
     this.datesContainer = document.getElementById('timeline-dates') as HTMLElement;
 
     // Set timeline to span from 2010 to now + 1 year
-    this.timelineStart = new Date(2010, 0, 1); // January 1, 2010
+    this.timelineStart = new Date(2013, 0, 1); // January 1, 2010
     this.timelineEnd = new Date();
     this.timelineEnd.setFullYear(this.timelineEnd.getFullYear() + 1);
 
