@@ -611,6 +611,12 @@ class Timeline {
     const event = this.events.find(e => e.id === id);
     if (!event) return;
 
+    const oldWrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
+    const wasSelected = this.selectedEventId === id;
+
+    // Store the next sibling to preserve position
+    const nextSibling = oldWrapper?.nextElementSibling;
+
     if (event.endDate === null) {
       // Set end date to end of current month
       event.endDate = this.snapToEndOfMonth(new Date());
@@ -619,16 +625,25 @@ class Timeline {
       event.endDate = null;
     }
 
-    // Re-render the event
-    const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`);
-    if (wrapper) {
-      wrapper.remove();
-      this.renderEvent(event);
+    // Remove old wrapper and re-render
+    if (oldWrapper) {
+      oldWrapper.remove();
 
-      // Restore selection if it was selected
-      if (this.selectedEventId === id) {
-        const newWrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`);
-        newWrapper?.classList.add('selected');
+      // Temporarily append to get the new wrapper
+      this.renderEvent(event);
+      const newWrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
+
+      // Move to original position
+      if (newWrapper) {
+        if (nextSibling) {
+          this.eventsContainer.insertBefore(newWrapper, nextSibling);
+        }
+        // If there was no next sibling, it's already at the end which is correct
+
+        // Restore selection if it was selected
+        if (wasSelected) {
+          newWrapper.classList.add('selected');
+        }
       }
     }
 
