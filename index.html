@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/webstorm-icon-logo.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timeline Application</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="logo">
+  <a href="https://www.jetbrains.com/webstorm/">
+    <img src="/webstorm-logo.svg" alt="WebStorm logo" width="344"
+         height="90">
+  </a>
+</header>
+<main id="app">
+  <h1 class="title">
+    Timeline Application
+  </h1>
+  <div class="controls">
+    <button id="addEvent" type="button">Add Event</button>
+  </div>
+  <div class="timeline-container">
+    <div class="timeline-header">
+      <div class="timeline-dates" id="timeline-dates"></div>
+    </div>
+    <div class="timeline-events" id="timeline-events"></div>
+  </div>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
