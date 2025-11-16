@@ -22,6 +22,10 @@ class Timeline {
   private timelineStart: Date;
   private timelineEnd: Date;
 
+  // Zoom factor: higher values give more weight to recent years
+  // 0 = linear (no zoom), 1 = moderate zoom, 2 = strong zoom
+  private zoomFactor = 1.5;
+
   // Color palette
   private readonly colorPalette = [
     '#017EFE', // Blue (default)
@@ -50,10 +54,9 @@ class Timeline {
     this.eventsContainer = document.getElementById('timeline-events') as HTMLElement;
     this.datesContainer = document.getElementById('timeline-dates') as HTMLElement;
 
-    // Set timeline to span from 2010 to now + 1 year
-    this.timelineStart = new Date(2013, 0, 1); // January 1, 2010
+    this.timelineStart = new Date(2013, 0, 1);
     this.timelineEnd = new Date();
-    this.timelineEnd.setFullYear(this.timelineEnd.getFullYear() + 1);
+    this.timelineEnd.setFullYear(this.timelineEnd.getFullYear());
 
     this.setupEventListeners();
     this.renderDateHeader();
@@ -70,23 +73,69 @@ class Timeline {
     document.addEventListener('click', (e) => this.handleDocumentClick(e));
   }
 
+  /**
+   * Converts a timestamp to a non-linear position (0-1) with zoom factor applied.
+   * Recent dates get more space, older dates get compressed.
+   */
+  private timeToZoomedPosition(timestamp: number): number {
+    const timelineSpan = this.timelineEnd.getTime() - this.timelineStart.getTime();
+    const offset = timestamp - this.timelineStart.getTime();
+    const linearPosition = offset / timelineSpan; // 0 to 1
+
+    if (this.zoomFactor === 0) {
+      return linearPosition; // No zoom, linear
+    }
+
+    // Use logarithmic scale for smoother compression
+    // Invert the position so recent dates expand and old dates compress
+    const scale = this.zoomFactor * 10; // Amplify the effect
+    const inverted = 1 - linearPosition; // Invert: 0 becomes 1, 1 becomes 0
+    const shifted = inverted * scale + 1; // Shift to avoid log(0)
+    const logMax = Math.log(scale + 1);
+    const logResult = Math.log(shifted) / logMax;
+
+    return 1 - logResult; // Invert back
+  }
+
+  /**
+   * Converts a zoomed position (0-1) back to a timestamp.
+   * Used for reverse mapping during dragging operations.
+   */
+  private zoomedPositionToTime(zoomedPosition: number): number {
+    const timelineSpan = this.timelineEnd.getTime() - this.timelineStart.getTime();
+
+    if (this.zoomFactor === 0) {
+      return this.timelineStart.getTime() + zoomedPosition * timelineSpan;
+    }
+
+    // Reverse the logarithmic zoom
+    const scale = this.zoomFactor * 10;
+    const logMax = Math.log(scale + 1);
+    const inverted = 1 - zoomedPosition; // Invert
+    const shifted = Math.exp(inverted * logMax);
+    const invertedLinear = (shifted - 1) / scale;
+    const linearPosition = 1 - invertedLinear; // Invert back
+
+    return this.timelineStart.getTime() + linearPosition * timelineSpan;
+  }
+
   private renderDateHeader() {
     this.datesContainer.innerHTML = '';
-    const years = [];
     const startYear = this.timelineStart.getFullYear();
     const endYear = this.timelineEnd.getFullYear();
 
-    // Create markers for each year
+    // Create markers for each year with zoomed positioning
     for (let year = startYear; year <= endYear; year++) {
-      years.push(year);
-    }
+      const yearDate = new Date(year, 0, 1); // January 1st of each year
+      const zoomedPos = this.timeToZoomedPosition(yearDate.getTime());
 
-    years.forEach(year => {
       const dateEl = document.createElement('div');
       dateEl.className = 'timeline-date';
       dateEl.textContent = year.toString();
+      dateEl.style.left = `${zoomedPos * 100}%`;
+      dateEl.style.position = 'absolute';
       this.datesContainer.appendChild(dateEl);
-    });
+    }
   }
 
   addEvent() {
@@ -238,15 +287,15 @@ class Timeline {
   }
 
   private updateEventPosition(wrapper: HTMLElement, eventEl: HTMLElement, event: TimelineEvent) {
-    const timelineSpan = this.timelineEnd.getTime() - this.timelineStart.getTime();
-
-    const startOffset = event.startDate.getTime() - this.timelineStart.getTime();
     // If no end date, use today's date for visualization
     const effectiveEndDate = event.endDate || new Date();
-    const endOffset = effectiveEndDate.getTime() - this.timelineStart.getTime();
 
-    const leftPercent = (startOffset / timelineSpan) * 100;
-    const widthPercent = ((endOffset - startOffset) / timelineSpan) * 100;
+    // Calculate zoomed positions
+    const startZoomedPos = this.timeToZoomedPosition(event.startDate.getTime());
+    const endZoomedPos = this.timeToZoomedPosition(effectiveEndDate.getTime());
+
+    const leftPercent = startZoomedPos * 100;
+    const widthPercent = (endZoomedPos - startZoomedPos) * 100;
 
     eventEl.style.width = `${Math.max(widthPercent, 5)}%`;
     eventEl.style.marginLeft = `${Math.max(leftPercent, 0)}%`;
@@ -405,21 +454,32 @@ class Timeline {
     if (!event) return;
 
     const containerWidth = this.eventsContainer.offsetWidth;
-    const timelineSpan = this.timelineEnd.getTime() - this.timelineStart.getTime();
-    const deltaTime = (deltaX / containerWidth) * timelineSpan;
+
+    // Calculate current zoomed position and new zoomed position
+    const currentZoomedPos = this.timeToZoomedPosition(
+      this.draggedEvent.type === 'resize-left' ? event.startDate.getTime() :
+      this.draggedEvent.type === 'resize-right' && event.endDate ? event.endDate.getTime() :
+      event.startDate.getTime()
+    );
+
+    const deltaZoomedPos = deltaX / containerWidth;
+    const newZoomedPos = currentZoomedPos + deltaZoomedPos;
+
+    // Convert back to timestamp
+    const newTimestamp = this.zoomedPositionToTime(newZoomedPos);
 
     if (this.draggedEvent.type === 'move') {
       // Only move if event has an end date
       if (event.endDate !== null) {
         const duration = event.endDate.getTime() - event.startDate.getTime();
-        event.startDate = new Date(event.startDate.getTime() + deltaTime);
-        event.endDate = new Date(event.startDate.getTime() + duration);
+        event.startDate = new Date(newTimestamp);
+        event.endDate = new Date(newTimestamp + duration);
       } else {
         // For open-ended events, only move the start date
-        event.startDate = new Date(event.startDate.getTime() + deltaTime);
+        event.startDate = new Date(newTimestamp);
       }
     } else if (this.draggedEvent.type === 'resize-left') {
-      const newStart = new Date(event.startDate.getTime() + deltaTime);
+      const newStart = new Date(newTimestamp);
       const compareDate = event.endDate || new Date();
       if (newStart < compareDate) {
         event.startDate = newStart;
@@ -427,7 +487,7 @@ class Timeline {
     } else if (this.draggedEvent.type === 'resize-right') {
       // Can't resize right handle if no end date
       if (event.endDate !== null) {
-        const newEnd = new Date(event.endDate.getTime() + deltaTime);
+        const newEnd = new Date(newTimestamp);
         if (newEnd > event.startDate) {
           event.endDate = newEnd;
         }
