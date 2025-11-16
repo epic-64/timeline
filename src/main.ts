@@ -54,7 +54,7 @@ class Timeline {
     this.eventsContainer = document.getElementById('timeline-events') as HTMLElement;
     this.datesContainer = document.getElementById('timeline-dates') as HTMLElement;
 
-    this.timelineStart = new Date(2013, 0, 1);
+    this.timelineStart = new Date(2010, 0, 1);
     this.timelineEnd = new Date();
     this.timelineEnd.setFullYear(this.timelineEnd.getFullYear());
 
