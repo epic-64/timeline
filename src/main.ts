@@ -13,7 +13,9 @@ class Timeline {
   private datesContainer: HTMLElement;
   private draggedEvent: { id: number; type: 'move' | 'resize-left' | 'resize-right' } | null = null;
   private dragStartX = 0;
+  private dragStartY = 0;
   private selectedEventId: number | null = null;
+  private isDraggingVertically = false;
 
   // Timeline spans 12 months from today
   private timelineStart: Date;
@@ -161,7 +163,7 @@ class Timeline {
       this.selectEvent(event.id);
     });
 
-    // Drag to move
+    // Drag to move (both horizontal and vertical)
     content.addEventListener('mousedown', (e) => this.startMove(e, event.id));
 
     this.eventsContainer.appendChild(wrapper);
@@ -233,6 +235,8 @@ class Timeline {
 
     this.draggedEvent = { id, type: 'move' };
     this.dragStartX = e.clientX;
+    this.dragStartY = e.clientY;
+    this.isDraggingVertically = false;
 
     const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
     const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
@@ -250,11 +254,28 @@ class Timeline {
   private handleMouseMove(e: MouseEvent) {
     if (!this.draggedEvent) return;
 
+    const deltaX = e.clientX - this.dragStartX;
+    const deltaY = e.clientY - this.dragStartY;
+
+    // Determine drag direction based on initial movement
+    if (!this.isDraggingVertically && this.draggedEvent.type === 'move') {
+      // If moved more than 5 pixels, determine direction
+      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+        this.isDraggingVertically = Math.abs(deltaY) > Math.abs(deltaX);
+      }
+    }
+
+    // Handle vertical reordering
+    if (this.isDraggingVertically && this.draggedEvent.type === 'move') {
+      this.handleReorderMove(e);
+      return;
+    }
+
+    // Handle horizontal timeline dragging (resize or horizontal move)
     const event = this.events.find(ev => ev.id === this.draggedEvent!.id);
     if (!event) return;
 
     const containerWidth = this.eventsContainer.offsetWidth;
-    const deltaX = e.clientX - this.dragStartX;
     const timelineSpan = this.timelineEnd.getTime() - this.timelineStart.getTime();
     const deltaTime = (deltaX / containerWidth) * timelineSpan;
 
@@ -294,41 +315,57 @@ class Timeline {
   }
 
   private handleMouseUp() {
-    if (this.draggedEvent) {
-      const event = this.events.find(ev => ev.id === this.draggedEvent!.id);
+    if (!this.draggedEvent) return;
 
-      if (event) {
-        // Apply snapping based on drag type
-        if (this.draggedEvent.type === 'resize-left' || this.draggedEvent.type === 'move') {
-          // Snap start date to beginning of month
-          event.startDate = this.snapToStartOfMonth(event.startDate);
-        }
-
-        if (event.endDate !== null && (this.draggedEvent.type === 'resize-right' || this.draggedEvent.type === 'move')) {
-          // Snap end date to end of month (only if end date exists)
-          event.endDate = this.snapToEndOfMonth(event.endDate);
-        }
-
-        // Ensure start is before end after snapping (only if end date exists)
-        if (event.endDate !== null && event.startDate >= event.endDate) {
-          // If snapping caused overlap, adjust end date to end of start date's month
-          event.endDate = this.snapToEndOfMonth(event.startDate);
-        }
-
-        // Update the visual position after snapping
-        const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
-        const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
-        if (wrapper && eventEl) {
-          this.updateEventPosition(wrapper, eventEl, event);
-        }
-      }
+    // Handle vertical reordering completion
+    if (this.isDraggingVertically && this.draggedEvent.type === 'move') {
+      this.handleReorderEnd();
 
       const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
       const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
       eventEl?.classList.remove('dragging');
+      eventEl?.classList.remove('reordering');
+
       this.draggedEvent = null;
-      this.saveEvents();
+      this.isDraggingVertically = false;
+      return;
     }
+
+    // Handle horizontal timeline dragging completion
+    const event = this.events.find(ev => ev.id === this.draggedEvent!.id);
+
+    if (event) {
+      // Apply snapping based on drag type
+      if (this.draggedEvent.type === 'resize-left' || this.draggedEvent.type === 'move') {
+        // Snap start date to beginning of month
+        event.startDate = this.snapToStartOfMonth(event.startDate);
+      }
+
+      if (event.endDate !== null && (this.draggedEvent.type === 'resize-right' || this.draggedEvent.type === 'move')) {
+        // Snap end date to end of month (only if end date exists)
+        event.endDate = this.snapToEndOfMonth(event.endDate);
+      }
+
+      // Ensure start is before end after snapping (only if end date exists)
+      if (event.endDate !== null && event.startDate >= event.endDate) {
+        // If snapping caused overlap, adjust end date to end of start date's month
+        event.endDate = this.snapToEndOfMonth(event.startDate);
+      }
+
+      // Update the visual position after snapping
+      const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
+      const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
+      if (wrapper && eventEl) {
+        this.updateEventPosition(wrapper, eventEl, event);
+      }
+    }
+
+    const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
+    const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
+    eventEl?.classList.remove('dragging');
+    this.draggedEvent = null;
+    this.isDraggingVertically = false;
+    this.saveEvents();
   }
 
   private deleteEvent(id: number) {
@@ -380,6 +417,68 @@ class Timeline {
     }
 
     this.saveEvents();
+  }
+
+  private handleReorderMove(e: MouseEvent) {
+    if (!this.draggedEvent) return;
+
+    const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
+    if (!wrapper) return;
+
+    // Add reordering class for visual feedback
+    wrapper.classList.add('reordering');
+
+    // Get all event wrappers
+    const wrappers = Array.from(this.eventsContainer.querySelectorAll('.timeline-event-wrapper')) as HTMLElement[];
+    const currentIndex = wrappers.indexOf(wrapper);
+
+    // Find which wrapper the mouse is over
+    const mouseY = e.clientY;
+    let targetIndex = currentIndex;
+
+    for (let i = 0; i < wrappers.length; i++) {
+      if (wrappers[i] === wrapper) continue;
+
+      const rect = wrappers[i].getBoundingClientRect();
+      const midpoint = rect.top + rect.height / 2;
+
+      if (mouseY < midpoint && i < currentIndex) {
+        targetIndex = i;
+        break;
+      } else if (mouseY > midpoint && i > currentIndex) {
+        targetIndex = i;
+      }
+    }
+
+    // Reorder in DOM if position changed
+    if (targetIndex !== currentIndex) {
+      if (targetIndex < currentIndex) {
+        wrappers[targetIndex].insertAdjacentElement('beforebegin', wrapper);
+      } else {
+        wrappers[targetIndex].insertAdjacentElement('afterend', wrapper);
+      }
+    }
+  }
+
+  private handleReorderEnd() {
+    if (!this.draggedEvent) return;
+
+    const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
+    wrapper?.classList.remove('reordering');
+
+    // Update events array to match DOM order
+    const wrappers = Array.from(this.eventsContainer.querySelectorAll('.timeline-event-wrapper')) as HTMLElement[];
+    const newOrder: TimelineEvent[] = [];
+
+    wrappers.forEach(w => {
+      const id = parseInt(w.dataset.id || '0', 10);
+      const event = this.events.find(e => e.id === id);
+      if (event) {
+        newOrder.push(event);
+      }
+    });
+
+    this.events = newOrder;
   }
 
   private handleDocumentClick(e: MouseEvent) {

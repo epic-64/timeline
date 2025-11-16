@@ -161,6 +161,16 @@ button:hover {
     transition: background-color 0.2s, border-color 0.2s;
 }
 
+
+.timeline-event-wrapper.reordering {
+    opacity: 0.5;
+    z-index: 1000;
+}
+
+.timeline-event-wrapper.reordering .timeline-event {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
 .timeline-event.open-ended {
     background: linear-gradient(to right,
         rgba(1, 126, 254, 0.3) 0%,
