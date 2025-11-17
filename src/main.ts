@@ -1,25 +1,30 @@
 import html2canvas from 'html2canvas';
 import { TimelineEvent } from './types';
 import {
+  calculateDuration,
+  formatDateRange,
+  snapToEndOfMonth,
+  snapToStartOfMonth,
   timeToZoomedPosition,
   zoomedPositionToTime,
-  formatDateRange,
-  calculateDuration,
-  snapToStartOfMonth,
-  snapToEndOfMonth
 } from './dateUtils';
+import { applyEventColor, COLOR_PALETTE, rgbToHex } from './colorUtils';
 import {
-  rgbToHex,
-  applyEventColor,
-  COLOR_PALETTE
-} from './colorUtils';
+  exportEventsToFile,
+  importEventsFromFile,
+  loadEventsFromLocalStorage,
+  saveEventsToLocalStorage,
+} from './storage';
 
 class Timeline {
   private events: TimelineEvent[] = [];
   private nextId = 1;
   private eventsContainer: HTMLElement;
   private datesContainer: HTMLElement;
-  private draggedEvent: { id: number; type: 'move' | 'resize-left' | 'resize-right' } | null = null;
+  private draggedEvent: {
+    id: number;
+    type: 'move' | 'resize-left' | 'resize-right';
+  } | null = null;
   private dragStartX = 0;
   private selectedEventId: number | null = null;
 
@@ -31,16 +36,23 @@ class Timeline {
   // 0 = linear (no zoom), 1 = moderate zoom, 2 = strong zoom
   private zoomFactor = 1.5;
 
-
   constructor() {
-    this.eventsContainer = document.getElementById('timeline-events') as HTMLElement;
-    this.datesContainer = document.getElementById('timeline-dates') as HTMLElement;
+    this.eventsContainer = document.getElementById(
+      'timeline-events',
+    ) as HTMLElement;
+    this.datesContainer = document.getElementById(
+      'timeline-dates',
+    ) as HTMLElement;
 
     // Load saved settings or use defaults
     const savedStartYear = localStorage.getItem('timelineStartYear');
     const savedEndDate = localStorage.getItem('timelineEndDate');
 
-    this.timelineStart = new Date(savedStartYear ? parseInt(savedStartYear) : 2010, 0, 1);
+    this.timelineStart = new Date(
+      savedStartYear ? parseInt(savedStartYear) : 2010,
+      0,
+      1,
+    );
     this.timelineEnd = savedEndDate ? new Date(savedEndDate) : new Date();
 
     this.setupEventListeners();
@@ -50,10 +62,18 @@ class Timeline {
   }
 
   private setupEventListeners() {
-    document.getElementById('addEvent')?.addEventListener('click', () => this.addEvent());
-    document.getElementById('exportEvents')?.addEventListener('click', () => this.exportEvents());
-    document.getElementById('importEvents')?.addEventListener('click', () => this.importEvents());
-    document.getElementById('downloadImage')?.addEventListener('click', () => this.downloadAsImage());
+    document
+      .getElementById('addEvent')
+      ?.addEventListener('click', () => this.addEvent());
+    document
+      .getElementById('exportEvents')
+      ?.addEventListener('click', () => this.exportEvents());
+    document
+      .getElementById('importEvents')
+      ?.addEventListener('click', () => this.importEvents());
+    document
+      .getElementById('downloadImage')
+      ?.addEventListener('click', () => this.downloadAsImage());
 
     document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
     document.addEventListener('mouseup', () => this.handleMouseUp());
@@ -61,7 +81,9 @@ class Timeline {
   }
 
   private initializeInputFields() {
-    const startYearInput = document.getElementById('startYear') as HTMLInputElement;
+    const startYearInput = document.getElementById(
+      'startYear',
+    ) as HTMLInputElement;
     const endDateInput = document.getElementById('endDate') as HTMLInputElement;
 
     if (startYearInput) {
@@ -87,7 +109,10 @@ class Timeline {
         const dateStr = (e.target as HTMLInputElement).value;
         if (dateStr) {
           this.timelineEnd = new Date(dateStr);
-          localStorage.setItem('timelineEndDate', this.timelineEnd.toISOString());
+          localStorage.setItem(
+            'timelineEndDate',
+            this.timelineEnd.toISOString(),
+          );
           this.refreshTimeline();
         }
       });
@@ -99,10 +124,12 @@ class Timeline {
     this.renderDateHeader();
 
     // Re-render all events with new positions
-    const wrappers = Array.from(this.eventsContainer.querySelectorAll('.timeline-event-wrapper')) as HTMLElement[];
-    wrappers.forEach(wrapper => {
+    const wrappers = Array.from(
+      this.eventsContainer.querySelectorAll('.timeline-event-wrapper'),
+    ) as HTMLElement[];
+    wrappers.forEach((wrapper) => {
       const id = parseInt(wrapper.dataset.id || '0', 10);
-      const event = this.events.find(e => e.id === id);
+      const event = this.events.find((e) => e.id === id);
       const eventEl = wrapper.querySelector('.timeline-event') as HTMLElement;
       if (event && eventEl) {
         this.updateEventPosition(wrapper, eventEl, event);
@@ -122,7 +149,7 @@ class Timeline {
         yearDate.getTime(),
         this.timelineStart,
         this.timelineEnd,
-        this.zoomFactor
+        this.zoomFactor,
       );
 
       const dateEl = document.createElement('div');
@@ -136,8 +163,9 @@ class Timeline {
 
   addEvent() {
     // Calculate the middle of the timeline range
-    const timelineSpan = this.timelineEnd.getTime() - this.timelineStart.getTime();
-    const middleTimestamp = this.timelineStart.getTime() + (timelineSpan / 2);
+    const timelineSpan =
+      this.timelineEnd.getTime() - this.timelineStart.getTime();
+    const middleTimestamp = this.timelineStart.getTime() + timelineSpan / 2;
 
     const start = new Date(middleTimestamp);
     const end = new Date(middleTimestamp);
@@ -151,7 +179,7 @@ class Timeline {
       startDate: start,
       endDate: end,
       color: COLOR_PALETTE[0], // Default blue
-      breaks: []
+      breaks: [],
     };
 
     this.events.push(event);
@@ -235,11 +263,15 @@ class Timeline {
     // Resize handles
     const leftHandle = document.createElement('div');
     leftHandle.className = 'timeline-event-handle left';
-    leftHandle.addEventListener('mousedown', (e) => this.startResize(e, event.id, 'resize-left'));
+    leftHandle.addEventListener('mousedown', (e) =>
+      this.startResize(e, event.id, 'resize-left'),
+    );
 
     const rightHandle = document.createElement('div');
     rightHandle.className = 'timeline-event-handle right';
-    rightHandle.addEventListener('mousedown', (e) => this.startResize(e, event.id, 'resize-right'));
+    rightHandle.addEventListener('mousedown', (e) =>
+      this.startResize(e, event.id, 'resize-right'),
+    );
 
     eventEl.appendChild(leftHandle);
     eventEl.appendChild(content);
@@ -249,7 +281,8 @@ class Timeline {
     const clearEndBtn = document.createElement('button');
     clearEndBtn.className = 'clear-end-button';
     clearEndBtn.textContent = event.endDate === null ? '📅' : '∞';
-    clearEndBtn.title = event.endDate === null ? 'Set End Date' : 'Clear End Date (Ongoing)';
+    clearEndBtn.title =
+      event.endDate === null ? 'Set End Date' : 'Clear End Date (Ongoing)';
     clearEndBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleEndDate(event.id);
@@ -268,7 +301,7 @@ class Timeline {
     // Color picker dropdown
     const colorPicker = document.createElement('div');
     colorPicker.className = 'color-picker';
-    COLOR_PALETTE.forEach(color => {
+    COLOR_PALETTE.forEach((color) => {
       const colorOption = document.createElement('div');
       colorOption.className = 'color-option';
       colorOption.style.backgroundColor = color;
@@ -315,9 +348,10 @@ class Timeline {
       this.selectEvent(event.id);
     });
 
-
     // Drag to reorder vertically only
-    content.addEventListener('mousedown', (e) => this.startVerticalReorder(e, event.id));
+    content.addEventListener('mousedown', (e) =>
+      this.startVerticalReorder(e, event.id),
+    );
 
     this.eventsContainer.appendChild(wrapper);
 
@@ -325,7 +359,11 @@ class Timeline {
     this.updateEventPosition(wrapper, eventEl, event);
   }
 
-  private updateEventPosition(wrapper: HTMLElement, eventEl: HTMLElement, event: TimelineEvent) {
+  private updateEventPosition(
+    wrapper: HTMLElement,
+    eventEl: HTMLElement,
+    event: TimelineEvent,
+  ) {
     // If no end date, use today's date for visualization
     const effectiveEndDate = event.endDate || new Date();
 
@@ -334,13 +372,13 @@ class Timeline {
       event.startDate.getTime(),
       this.timelineStart,
       this.timelineEnd,
-      this.zoomFactor
+      this.zoomFactor,
     );
     const endZoomedPos = timeToZoomedPosition(
       effectiveEndDate.getTime(),
       this.timelineStart,
       this.timelineEnd,
-      this.zoomFactor
+      this.zoomFactor,
     );
 
     const leftPercent = startZoomedPos * 100;
@@ -356,7 +394,8 @@ class Timeline {
     this.renderBreaks(eventEl, event);
 
     // Determine if event is short (less than 2 years)
-    const eventDuration = effectiveEndDate.getTime() - event.startDate.getTime();
+    const eventDuration =
+      effectiveEndDate.getTime() - event.startDate.getTime();
     const twoYearsInMs = 2 * 365.25 * 24 * 60 * 60 * 1000;
     const isShortEvent = eventDuration < twoYearsInMs;
 
@@ -376,9 +415,15 @@ class Timeline {
 
     // Update both date displays
     const datesEl = eventEl.querySelector('.timeline-event-dates');
-    const externalDatesEl = wrapper.querySelector('.timeline-event-dates-external');
+    const externalDatesEl = wrapper.querySelector(
+      '.timeline-event-dates-external',
+    );
     const dateText = formatDateRange(event.startDate, event.endDate);
-    const durationText = calculateDuration(event.startDate, event.endDate, event.breaks);
+    const durationText = calculateDuration(
+      event.startDate,
+      event.endDate,
+      event.breaks,
+    );
     const fullText = `${dateText}<br><span class="duration">${durationText}</span>`;
 
     if (datesEl) {
@@ -388,7 +433,6 @@ class Timeline {
       externalDatesEl.innerHTML = fullText;
     }
   }
-
 
   private startVerticalReorder(e: MouseEvent, id: number) {
     const target = e.target as HTMLElement;
@@ -404,12 +448,18 @@ class Timeline {
     this.draggedEvent = { id, type: 'move' };
     this.dragStartX = e.clientX;
 
-    const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
+    const wrapper = this.eventsContainer.querySelector(
+      `[data-id="${id}"]`,
+    ) as HTMLElement;
     const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
     eventEl?.classList.add('reordering');
   }
 
-  private startResize(e: MouseEvent, id: number, type: 'resize-left' | 'resize-right') {
+  private startResize(
+    e: MouseEvent,
+    id: number,
+    type: 'resize-left' | 'resize-right',
+  ) {
     e.preventDefault();
     e.stopPropagation();
 
@@ -427,7 +477,7 @@ class Timeline {
     }
 
     // Handle horizontal timeline dragging (resize only)
-    const event = this.events.find(ev => ev.id === this.draggedEvent!.id);
+    const event = this.events.find((ev) => ev.id === this.draggedEvent!.id);
     if (!event) return;
 
     const deltaX = e.clientX - this.dragStartX;
@@ -435,18 +485,26 @@ class Timeline {
 
     // Calculate current zoomed position and new zoomed position
     const currentZoomedPos = timeToZoomedPosition(
-      this.draggedEvent.type === 'resize-left' ? event.startDate.getTime() :
-      event.endDate ? event.endDate.getTime() : event.startDate.getTime(),
+      this.draggedEvent.type === 'resize-left'
+        ? event.startDate.getTime()
+        : event.endDate
+          ? event.endDate.getTime()
+          : event.startDate.getTime(),
       this.timelineStart,
       this.timelineEnd,
-      this.zoomFactor
+      this.zoomFactor,
     );
 
     const deltaZoomedPos = deltaX / containerWidth;
     const newZoomedPos = currentZoomedPos + deltaZoomedPos;
 
     // Convert back to timestamp
-    const newTimestamp = zoomedPositionToTime(newZoomedPos, this.timelineStart, this.timelineEnd, this.zoomFactor);
+    const newTimestamp = zoomedPositionToTime(
+      newZoomedPos,
+      this.timelineStart,
+      this.timelineEnd,
+      this.zoomFactor,
+    );
 
     if (this.draggedEvent.type === 'resize-left') {
       const newStart = new Date(newTimestamp);
@@ -466,7 +524,9 @@ class Timeline {
 
     this.dragStartX = e.clientX;
 
-    const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
+    const wrapper = this.eventsContainer.querySelector(
+      `[data-id="${this.draggedEvent.id}"]`,
+    ) as HTMLElement;
     const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
     if (wrapper && eventEl) {
       this.updateEventPosition(wrapper, eventEl, event);
@@ -480,7 +540,9 @@ class Timeline {
     if (this.draggedEvent.type === 'move') {
       this.handleReorderEnd();
 
-      const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
+      const wrapper = this.eventsContainer.querySelector(
+        `[data-id="${this.draggedEvent.id}"]`,
+      ) as HTMLElement;
       const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
       eventEl?.classList.remove('dragging');
       eventEl?.classList.remove('reordering');
@@ -490,7 +552,7 @@ class Timeline {
     }
 
     // Handle horizontal timeline dragging completion (resize only)
-    const event = this.events.find(ev => ev.id === this.draggedEvent!.id);
+    const event = this.events.find((ev) => ev.id === this.draggedEvent!.id);
 
     if (event) {
       // Apply snapping based on resize type
@@ -511,14 +573,18 @@ class Timeline {
       }
 
       // Update the visual position after snapping
-      const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
+      const wrapper = this.eventsContainer.querySelector(
+        `[data-id="${this.draggedEvent.id}"]`,
+      ) as HTMLElement;
       const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
       if (wrapper && eventEl) {
         this.updateEventPosition(wrapper, eventEl, event);
       }
     }
 
-    const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
+    const wrapper = this.eventsContainer.querySelector(
+      `[data-id="${this.draggedEvent.id}"]`,
+    ) as HTMLElement;
     const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
     eventEl?.classList.remove('dragging');
     this.draggedEvent = null;
@@ -526,7 +592,7 @@ class Timeline {
   }
 
   private deleteEvent(id: number) {
-    this.events = this.events.filter(e => e.id !== id);
+    this.events = this.events.filter((e) => e.id !== id);
     const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`);
     wrapper?.remove();
     if (this.selectedEventId === id) {
@@ -538,7 +604,9 @@ class Timeline {
   private selectEvent(id: number) {
     // Deselect previous
     if (this.selectedEventId !== null) {
-      const prevWrapper = this.eventsContainer.querySelector(`[data-id="${this.selectedEventId}"]`);
+      const prevWrapper = this.eventsContainer.querySelector(
+        `[data-id="${this.selectedEventId}"]`,
+      );
       prevWrapper?.classList.remove('selected');
     }
 
@@ -549,10 +617,12 @@ class Timeline {
   }
 
   private toggleEndDate(id: number) {
-    const event = this.events.find(e => e.id === id);
+    const event = this.events.find((e) => e.id === id);
     if (!event) return;
 
-    const oldWrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
+    const oldWrapper = this.eventsContainer.querySelector(
+      `[data-id="${id}"]`,
+    ) as HTMLElement;
     const wasSelected = this.selectedEventId === id;
 
     // Store the next sibling to preserve position
@@ -572,7 +642,9 @@ class Timeline {
 
       // Temporarily append to get the new wrapper
       this.renderEvent(event);
-      const newWrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
+      const newWrapper = this.eventsContainer.querySelector(
+        `[data-id="${id}"]`,
+      ) as HTMLElement;
 
       // Move to original position
       if (newWrapper) {
@@ -592,13 +664,15 @@ class Timeline {
   }
 
   private toggleColorPicker(id: number) {
-    const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
+    const wrapper = this.eventsContainer.querySelector(
+      `[data-id="${id}"]`,
+    ) as HTMLElement;
     const colorPicker = wrapper?.querySelector('.color-picker') as HTMLElement;
 
     if (!colorPicker) return;
 
     // Close all other color pickers
-    document.querySelectorAll('.color-picker.show').forEach(picker => {
+    document.querySelectorAll('.color-picker.show').forEach((picker) => {
       if (picker !== colorPicker) {
         picker.classList.remove('show');
       }
@@ -608,12 +682,14 @@ class Timeline {
   }
 
   private changeEventColor(id: number, color: string) {
-    const event = this.events.find(e => e.id === id);
+    const event = this.events.find((e) => e.id === id);
     if (!event) return;
 
     event.color = color;
 
-    const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
+    const wrapper = this.eventsContainer.querySelector(
+      `[data-id="${id}"]`,
+    ) as HTMLElement;
     const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
     const colorPicker = wrapper?.querySelector('.color-picker') as HTMLElement;
 
@@ -624,9 +700,12 @@ class Timeline {
 
     // Update selected color option
     if (colorPicker) {
-      colorPicker.querySelectorAll('.color-option').forEach(option => {
+      colorPicker.querySelectorAll('.color-option').forEach((option) => {
         const optionEl = option as HTMLElement;
-        if (optionEl.style.backgroundColor === color || rgbToHex(optionEl.style.backgroundColor) === color) {
+        if (
+          optionEl.style.backgroundColor === color ||
+          rgbToHex(optionEl.style.backgroundColor) === color
+        ) {
           optionEl.classList.add('selected');
         } else {
           optionEl.classList.remove('selected');
@@ -638,10 +717,11 @@ class Timeline {
     this.saveEvents();
   }
 
-
   private renderBreaks(eventEl: HTMLElement, event: TimelineEvent) {
     // Remove existing break overlays
-    eventEl.querySelectorAll('.timeline-event-break').forEach(el => el.remove());
+    eventEl
+      .querySelectorAll('.timeline-event-break')
+      .forEach((el) => el.remove());
 
     if (!event.breaks || event.breaks.length === 0) return;
 
@@ -653,7 +733,7 @@ class Timeline {
     if (eventDuration <= 0) return;
 
     // Render each break as an overlay
-    event.breaks.forEach(breakPeriod => {
+    event.breaks.forEach((breakPeriod) => {
       const breakStart = new Date(breakPeriod.startDate).getTime();
       const breakEnd = new Date(breakPeriod.endDate).getTime();
 
@@ -663,22 +743,24 @@ class Timeline {
         const effectiveBreakEnd = Math.min(breakEnd, eventEnd);
 
         // Calculate position and width as percentage of event bar
-        const leftPercent = ((effectiveBreakStart - eventStart) / eventDuration) * 100;
-        const widthPercent = ((effectiveBreakEnd - effectiveBreakStart) / eventDuration) * 100;
+        const leftPercent =
+          ((effectiveBreakStart - eventStart) / eventDuration) * 100;
+        const widthPercent =
+          ((effectiveBreakEnd - effectiveBreakStart) / eventDuration) * 100;
 
         const breakEl = document.createElement('div');
         breakEl.className = 'timeline-event-break';
         breakEl.style.left = `${leftPercent}%`;
         breakEl.style.width = `${widthPercent}%`;
         breakEl.title = `Break: ${new Date(breakPeriod.startDate).toLocaleDateString()} - ${new Date(breakPeriod.endDate).toLocaleDateString()}`;
-        
+
         eventEl.appendChild(breakEl);
       }
     });
   }
 
   private openBreaksDialog(id: number) {
-    const event = this.events.find(e => e.id === id);
+    const event = this.events.find((e) => e.id === id);
     if (!event) return;
 
     // Create modal backdrop
@@ -699,7 +781,7 @@ class Timeline {
 
     const renderBreaksList = () => {
       breaksList.innerHTML = '';
-      
+
       if (event.breaks.length === 0) {
         const emptyMsg = document.createElement('p');
         emptyMsg.className = 'empty-message';
@@ -712,14 +794,24 @@ class Timeline {
 
           const breakInfo = document.createElement('div');
           breakInfo.className = 'break-info';
-          
-          const startStr = new Date(breakPeriod.startDate).toLocaleDateString('en-US', { 
-            month: 'short', day: 'numeric', year: 'numeric' 
-          });
-          const endStr = new Date(breakPeriod.endDate).toLocaleDateString('en-US', { 
-            month: 'short', day: 'numeric', year: 'numeric' 
-          });
-          
+
+          const startStr = new Date(breakPeriod.startDate).toLocaleDateString(
+            'en-US',
+            {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            },
+          );
+          const endStr = new Date(breakPeriod.endDate).toLocaleDateString(
+            'en-US',
+            {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            },
+          );
+
           breakInfo.textContent = `${startStr} - ${endStr}`;
 
           const deleteBtn = document.createElement('button');
@@ -791,10 +883,12 @@ class Timeline {
       }
 
       event.breaks.push({ startDate: start, endDate: end });
-      
+
       // Sort breaks by start date
-      event.breaks.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-      
+      event.breaks.sort(
+        (a, b) => a.startDate.getTime() - b.startDate.getTime(),
+      );
+
       renderBreaksList();
       this.updateEventAfterBreaksChange(id);
 
@@ -829,10 +923,12 @@ class Timeline {
   }
 
   private updateEventAfterBreaksChange(id: number) {
-    const event = this.events.find(e => e.id === id);
+    const event = this.events.find((e) => e.id === id);
     if (!event) return;
 
-    const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`) as HTMLElement;
+    const wrapper = this.eventsContainer.querySelector(
+      `[data-id="${id}"]`,
+    ) as HTMLElement;
     const eventEl = wrapper?.querySelector('.timeline-event') as HTMLElement;
 
     if (wrapper && eventEl) {
@@ -845,14 +941,18 @@ class Timeline {
   private handleReorderMove(e: MouseEvent) {
     if (!this.draggedEvent) return;
 
-    const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
+    const wrapper = this.eventsContainer.querySelector(
+      `[data-id="${this.draggedEvent.id}"]`,
+    ) as HTMLElement;
     if (!wrapper) return;
 
     // Add reordering class for visual feedback
     wrapper.classList.add('reordering');
 
     // Get all event wrappers
-    const wrappers = Array.from(this.eventsContainer.querySelectorAll('.timeline-event-wrapper')) as HTMLElement[];
+    const wrappers = Array.from(
+      this.eventsContainer.querySelectorAll('.timeline-event-wrapper'),
+    ) as HTMLElement[];
     const currentIndex = wrappers.indexOf(wrapper);
 
     // Find which wrapper the mouse is over
@@ -886,16 +986,20 @@ class Timeline {
   private handleReorderEnd() {
     if (!this.draggedEvent) return;
 
-    const wrapper = this.eventsContainer.querySelector(`[data-id="${this.draggedEvent.id}"]`) as HTMLElement;
+    const wrapper = this.eventsContainer.querySelector(
+      `[data-id="${this.draggedEvent.id}"]`,
+    ) as HTMLElement;
     wrapper?.classList.remove('reordering');
 
     // Update events array to match DOM order
-    const wrappers = Array.from(this.eventsContainer.querySelectorAll('.timeline-event-wrapper')) as HTMLElement[];
+    const wrappers = Array.from(
+      this.eventsContainer.querySelectorAll('.timeline-event-wrapper'),
+    ) as HTMLElement[];
     const newOrder: TimelineEvent[] = [];
 
-    wrappers.forEach(w => {
+    wrappers.forEach((w) => {
       const id = parseInt(w.dataset.id || '0', 10);
-      const event = this.events.find(e => e.id === id);
+      const event = this.events.find((e) => e.id === id);
       if (event) {
         newOrder.push(event);
       }
@@ -909,146 +1013,65 @@ class Timeline {
 
     // Close color pickers if clicking outside
     if (!target.closest('.color-picker') && !target.closest('.color-button')) {
-      document.querySelectorAll('.color-picker.show').forEach(picker => {
+      document.querySelectorAll('.color-picker.show').forEach((picker) => {
         picker.classList.remove('show');
       });
     }
 
     // Deselect if not clicking on the actual timeline event bar
     if (!target.closest('.timeline-event') && this.selectedEventId !== null) {
-      const prevWrapper = this.eventsContainer.querySelector(`[data-id="${this.selectedEventId}"]`);
+      const prevWrapper = this.eventsContainer.querySelector(
+        `[data-id="${this.selectedEventId}"]`,
+      );
       prevWrapper?.classList.remove('selected');
       this.selectedEventId = null;
     }
   }
 
   private saveEvents() {
-    const eventsData = this.events.map(event => ({
-      id: event.id,
-      name: event.name,
-      startDate: event.startDate.toISOString(),
-      endDate: event.endDate ? event.endDate.toISOString() : null,
-      color: event.color,
-      breaks: event.breaks.map(b => ({
-        startDate: b.startDate.toISOString(),
-        endDate: b.endDate.toISOString()
-      }))
-    }));
-    localStorage.setItem('timelineEvents', JSON.stringify(eventsData));
-    localStorage.setItem('timelineNextId', this.nextId.toString());
+    saveEventsToLocalStorage(this.events, this.nextId);
   }
 
   private loadEvents() {
-    const storedEvents = localStorage.getItem('timelineEvents');
-    const storedNextId = localStorage.getItem('timelineNextId');
+    const { events, nextId } = loadEventsFromLocalStorage();
+    this.events = events;
+    this.nextId = nextId;
 
-    if (storedNextId) {
-      this.nextId = parseInt(storedNextId, 10);
-    }
-
-    if (storedEvents) {
-      try {
-        const eventsData = JSON.parse(storedEvents);
-        this.events = eventsData.map((data: any) => ({
-          id: data.id,
-          name: data.name,
-          startDate: new Date(data.startDate),
-          endDate: data.endDate ? new Date(data.endDate) : null,
-          color: data.color || COLOR_PALETTE[0], // Default to blue if no color
-          breaks: data.breaks ? data.breaks.map((b: any) => ({
-            startDate: new Date(b.startDate),
-            endDate: new Date(b.endDate)
-          })) : []
-        }));
-
-        // Render all loaded events
-        this.events.forEach(event => this.renderEvent(event));
-      } catch (error) {
-        console.error('Failed to load events from localStorage:', error);
-      }
-    }
+    // Render all loaded events
+    this.events.forEach((event) => this.renderEvent(event));
   }
 
   private exportEvents() {
-    const eventsData = this.events.map(event => ({
-      id: event.id,
-      name: event.name,
-      startDate: event.startDate.toISOString(),
-      endDate: event.endDate ? event.endDate.toISOString() : null,
-      color: event.color,
-      breaks: event.breaks.map(b => ({
-        startDate: b.startDate.toISOString(),
-        endDate: b.endDate.toISOString()
-      }))
-    }));
-
-    const dataStr = JSON.stringify(eventsData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `timeline-events-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    exportEventsToFile(this.events);
   }
 
-  private importEvents() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json';
+  private async importEvents() {
+    try {
+      const { events, nextId } = await importEventsFromFile();
 
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
+      // Clear existing events
+      this.eventsContainer.innerHTML = '';
+      this.events = [];
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const eventsData = JSON.parse(event.target?.result as string);
+      // Import new events
+      events.forEach((event) => {
+        this.events.push(event);
+        this.renderEvent(event);
+      });
 
-          // Clear existing events
-          this.eventsContainer.innerHTML = '';
-          this.events = [];
-
-          // Import new events
-          eventsData.forEach((data: any) => {
-            const event: TimelineEvent = {
-              id: data.id,
-              name: data.name,
-              startDate: new Date(data.startDate),
-              endDate: data.endDate ? new Date(data.endDate) : null,
-              color: data.color || COLOR_PALETTE[0],
-              breaks: data.breaks ? data.breaks.map((b: any) => ({
-                startDate: new Date(b.startDate),
-                endDate: new Date(b.endDate)
-              })) : []
-            };
-            this.events.push(event);
-            this.renderEvent(event);
-          });
-
-          // Update nextId to be higher than any imported id
-          const maxId = Math.max(...this.events.map(e => e.id), 0);
-          this.nextId = maxId + 1;
-
-          this.saveEvents();
-          alert('Events imported successfully!');
-        } catch (error) {
-          console.error('Failed to import events:', error);
-          alert('Failed to import events. Please check the file format.');
-        }
-      };
-      reader.readAsText(file);
-    };
-
-    input.click();
+      this.nextId = nextId;
+      this.saveEvents();
+      alert('Events imported successfully!');
+    } catch (error) {
+      console.error('Failed to import events:', error);
+      alert('Failed to import events. Please check the file format.');
+    }
   }
 
   private async downloadAsImage() {
-    const timelineContainer = document.querySelector('.timeline-container') as HTMLElement;
+    const timelineContainer = document.querySelector(
+      '.timeline-container',
+    ) as HTMLElement;
     if (!timelineContainer) {
       alert('Timeline not found!');
       return;
@@ -1057,28 +1080,32 @@ class Timeline {
     try {
       // Hide UI elements that shouldn't be in the image
       const elementsToHide = timelineContainer.querySelectorAll(
-        '.delete-button, .color-button, .clear-end-button, .color-picker, .timeline-event-handle'
+        '.delete-button, .color-button, .clear-end-button, .color-picker, .timeline-event-handle',
       );
-      elementsToHide.forEach(el => (el as HTMLElement).style.display = 'none');
+      elementsToHide.forEach(
+        (el) => ((el as HTMLElement).style.display = 'none'),
+      );
 
       // Remove selected state temporarily
       const selectedElements = timelineContainer.querySelectorAll('.selected');
-      selectedElements.forEach(el => el.classList.remove('selected'));
+      selectedElements.forEach((el) => el.classList.remove('selected'));
 
       // Capture the timeline
       const canvas = await html2canvas(timelineContainer, {
         backgroundColor: '#000000',
         scale: 2, // Higher resolution
         logging: false,
-        useCORS: true
+        useCORS: true,
       });
 
       // Restore hidden elements
-      elementsToHide.forEach(el => (el as HTMLElement).style.display = '');
+      elementsToHide.forEach((el) => ((el as HTMLElement).style.display = ''));
 
       // Restore selected state
       if (this.selectedEventId !== null) {
-        const wrapper = this.eventsContainer.querySelector(`[data-id="${this.selectedEventId}"]`);
+        const wrapper = this.eventsContainer.querySelector(
+          `[data-id="${this.selectedEventId}"]`,
+        );
         wrapper?.classList.add('selected');
       }
 
@@ -1101,13 +1128,15 @@ class Timeline {
 
       // Restore hidden elements in case of error
       const elementsToHide = timelineContainer.querySelectorAll(
-        '.delete-button, .color-button, .clear-end-button, .color-picker, .timeline-event-handle'
+        '.delete-button, .color-button, .clear-end-button, .color-picker, .timeline-event-handle',
       );
-      elementsToHide.forEach(el => (el as HTMLElement).style.display = '');
+      elementsToHide.forEach((el) => ((el as HTMLElement).style.display = ''));
 
       // Restore selected state
       if (this.selectedEventId !== null) {
-        const wrapper = this.eventsContainer.querySelector(`[data-id="${this.selectedEventId}"]`);
+        const wrapper = this.eventsContainer.querySelector(
+          `[data-id="${this.selectedEventId}"]`,
+        );
         wrapper?.classList.add('selected');
       }
     }
