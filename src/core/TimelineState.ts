@@ -49,12 +49,7 @@ export class TimelineState implements EventStateProvider {
    * Get an event by ID.
    */
   getEventById(id: number): TimelineEvent | undefined {
-    console.log('getEventById called with id:', id);
-    console.log('this.events:', this.events);
-    console.log('this.events length:', this.events?.length);
-    const result = findEventById(this.events, id);
-    console.log('findEventById result:', result);
-    return result;
+    return findEventById(this.events, id);
   }
 
   /**

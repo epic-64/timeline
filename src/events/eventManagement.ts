@@ -36,22 +36,11 @@ export function findEventById(
   events: TimelineEvent[],
   id: number,
 ): TimelineEvent | undefined {
-  console.log('findEventById: searching for id', id);
-  console.log('events is array?', Array.isArray(events));
-  console.log('events length:', events?.length);
-  console.log('events:', events);
-
   if (!events || !Array.isArray(events)) {
-    console.log('events is not a valid array!');
     return undefined;
   }
 
-  const result = events.find((e) => {
-    console.log(`Comparing e.id=${e.id} (${typeof e.id}) with id=${id} (${typeof id}), equal=${e.id === id}`);
-    return e.id === id;
-  });
-  console.log('findEventById result:', result);
-  return result;
+  return events.find((e) => e.id === id);
 }
 
 /**

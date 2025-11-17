@@ -6,9 +6,17 @@ import { TimelineEvent } from '../../events/types';
 import * as storage from '../../events/storage';
 import * as eventManagement from '../../events/eventManagement';
 
-// Mock the storage module
+// Mock only the storage module (has side effects)
 jest.mock('../../events/storage');
-jest.mock('../../events/eventManagement');
+
+// Partial mock: only mock functions with side effects, keep pure functions
+jest.mock('../../events/eventManagement', () => {
+  const actual = jest.requireActual('../../events/eventManagement');
+  return {
+    ...actual,
+    createNewEvent: jest.fn(),
+  };
+});
 
 describe('TimelineState', () => {
   let container: HTMLElement;
@@ -73,7 +81,7 @@ describe('TimelineState', () => {
     (storage.saveEventsToLocalStorage as jest.Mock).mockImplementation(() => {});
     (storage.exportEventsToFile as jest.Mock).mockImplementation(() => {});
 
-    // Mock event management
+    // Mock event management - only mock functions with side effects
     (eventManagement.createNewEvent as jest.Mock).mockImplementation((id) => ({
       id,
       name: `Event ${id}`,
@@ -82,16 +90,6 @@ describe('TimelineState', () => {
       color: '#017EFE',
       breaks: [],
     }));
-
-    // Mock findEventById to return events from the internal events array
-    (eventManagement.findEventById as jest.Mock).mockImplementation((events, id) => {
-      return events.find((e: TimelineEvent) => e.id === id);
-    });
-
-    // Mock removeEventById to filter out the event by id
-    (eventManagement.removeEventById as jest.Mock).mockImplementation((events, id) => {
-      return events.filter((e: TimelineEvent) => e.id !== id);
-    });
   });
 
   afterEach(() => {
