@@ -1,4 +1,17 @@
-import { TimelineEvent } from './types';
+// Event-related imports
+import {
+  TimelineEvent,
+  createNewEvent,
+  findEventById,
+  removeEventById,
+  isShortEvent,
+  loadEventsFromLocalStorage,
+  saveEventsToLocalStorage,
+  exportEventsToFile,
+  importEventsFromFile,
+} from './events';
+
+// Utility imports
 import {
   calculateDuration,
   formatDateRange,
@@ -6,24 +19,21 @@ import {
   snapToStartOfMonth,
   timeToZoomedPosition,
   zoomedPositionToTime,
-} from './dateUtils';
-import { applyEventColor, rgbToHex } from './colorUtils';
+  applyEventColor,
+  rgbToHex,
+  loadTimelineStartDate,
+  loadTimelineEndDate,
+  saveTimelineStartYear,
+  saveTimelineEndDate,
+  isValidYear,
+  formatDateForInput,
+  createYearMarkers,
+} from './utils';
+
+// DOM-related imports
 import {
-  exportEventsToFile,
-  importEventsFromFile,
-  loadEventsFromLocalStorage,
-  saveEventsToLocalStorage,
-} from './storage';
-import { createEventElement, renderBreaks } from './domUtils';
-import { openBreaksDialog } from './breaksDialog';
-import { downloadTimelineAsImage } from './imageExport';
-import {
-  createNewEvent,
-  findEventById,
-  removeEventById,
-  isShortEvent,
-} from './eventManagement';
-import {
+  createEventElement,
+  renderBreaks,
   findEventWrapper,
   findEventElement,
   getAllEventWrappers,
@@ -33,16 +43,9 @@ import {
   findColorPicker,
   findDateDisplayElements,
   updateDateDisplays,
-} from './domSelectors';
-import {
-  loadTimelineStartDate,
-  loadTimelineEndDate,
-  saveTimelineStartYear,
-  saveTimelineEndDate,
-  isValidYear,
-  formatDateForInput,
-  createYearMarkers,
-} from './timelineConfig';
+  openBreaksDialog,
+  downloadTimelineAsImage,
+} from './dom';
 
 class Timeline {
   private events: TimelineEvent[] = [];

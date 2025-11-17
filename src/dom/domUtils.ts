@@ -1,6 +1,6 @@
-import { TimelineEvent } from './types';
-import { formatDateRange, calculateDuration } from './dateUtils';
-import { applyEventColor, COLOR_PALETTE } from './colorUtils';
+import { TimelineEvent } from '../events/types';
+import { formatDateRange, calculateDuration } from '../utils/dateUtils';
+import { applyEventColor, COLOR_PALETTE } from '../utils/colorUtils';
 
 /**
  * Creates a timeline event wrapper with all its UI components.

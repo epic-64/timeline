@@ -1,4 +1,4 @@
-import { TimelineEvent } from './types';
+import { TimelineEvent } from '../events/types';
 
 /**
  * Opens a modal dialog for managing breaks in a timeline event.

@@ -1,5 +1,5 @@
 import { TimelineEvent } from './types';
-import { COLOR_PALETTE } from './colorUtils';
+import { COLOR_PALETTE } from '../utils/colorUtils';
 
 /**
  * Serializes events to JSON format for storage.

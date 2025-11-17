@@ -1,4 +1,4 @@
-import { Break } from './types';
+import { Break } from '../events/types';
 
 /**
  * Converts a timestamp to a non-linear position (0-1) with zoom factor applied.
