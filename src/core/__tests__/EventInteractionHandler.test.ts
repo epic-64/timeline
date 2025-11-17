@@ -1,6 +1,6 @@
 import { EventInteractionHandler } from '../EventInteractionHandler';
 import { EventRenderer } from '../EventRenderer';
-import { TimelineEvent } from '../../events/types';
+import { TimelineEvent } from '../../events';
 import { EventStateProvider } from '../EventStateProvider';
 
 describe('EventInteractionHandler', () => {
@@ -49,6 +49,7 @@ describe('EventInteractionHandler', () => {
     ];
 
     // Create mock state provider
+    let selectedId: number | null = null;
     mockStateProvider = {
       getEventById: jest.fn((id: number) => mockEvents.find(e => e.id === id)),
       getAllEvents: jest.fn(() => mockEvents),
@@ -59,6 +60,10 @@ describe('EventInteractionHandler', () => {
         }
       }),
       reorderEventsFromDOM: jest.fn(),
+      getSelectedEventId: jest.fn(() => selectedId),
+      setSelectedEventId: jest.fn((id: number | null) => {
+        selectedId = id;
+      }),
     };
 
     handler = new EventInteractionHandler(

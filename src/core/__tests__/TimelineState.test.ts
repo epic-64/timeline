@@ -2,7 +2,7 @@ import { TimelineState } from '../TimelineState';
 import { TimelineConfig } from '../TimelineConfig';
 import { EventRenderer } from '../EventRenderer';
 import { EventInteractionHandler } from '../EventInteractionHandler';
-import { TimelineEvent } from '../../events/types';
+import { TimelineEvent } from '../../events';
 import * as storage from '../../events/storage';
 import * as eventManagement from '../../events/eventManagement';
 
@@ -58,8 +58,8 @@ describe('TimelineState', () => {
     config = new TimelineConfig(datesContainer);
     renderer = new EventRenderer(container, () => config.getTimelineParams());
 
-    // Create state first (it will be the state provider)
-    state = new TimelineState(container, config, renderer, null as any);
+    // Create state without handler (no circular dependency!)
+    state = new TimelineState(container, config, renderer);
 
     // Create interaction handler with state as provider
     interactionHandler = new EventInteractionHandler(
@@ -70,8 +70,14 @@ describe('TimelineState', () => {
       jest.fn(),
     );
 
-    // Wire up the handler back to state
-    (state as any).interactionHandler = interactionHandler;
+    // Wire up interaction handlers (breaks circular dependency)
+    state.setInteractionHandlers({
+      startResize: jest.fn(),
+      toggleColorPicker: jest.fn(),
+      changeEventColor: jest.fn(),
+      selectEvent: (id) => interactionHandler.selectEvent(id),
+      startVerticalReorder: jest.fn(),
+    });
 
     // Mock storage functions
     (storage.loadEventsFromLocalStorage as jest.Mock).mockReturnValue({

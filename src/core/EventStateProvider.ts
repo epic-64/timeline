@@ -24,5 +24,15 @@ export interface EventStateProvider {
    * Reorder events based on their current DOM order.
    */
   reorderEventsFromDOM(orderedIds: number[]): void;
+
+  /**
+   * Get the currently selected event ID.
+   */
+  getSelectedEventId(): number | null;
+
+  /**
+   * Set the currently selected event ID.
+   */
+  setSelectedEventId(id: number | null): void;
 }
 

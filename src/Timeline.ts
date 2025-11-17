@@ -24,12 +24,11 @@ export class Timeline {
       this.config.getTimelineParams(),
     );
 
-    // Create state first (without handler reference)
+    // Create state without handler (no circular dependency!)
     this.state = new TimelineState(
       eventsContainer,
       this.config,
       this.renderer,
-      null as any, // Will be set after handler is created
     );
 
     // Create interaction handler with state as provider
@@ -41,8 +40,14 @@ export class Timeline {
       () => {}, // Will be handled by TimelineState through updateEvent
     );
 
-    // Wire up the interaction handler in state
-    (this.state as any).interactionHandler = this.interactionHandler;
+    // Wire up interaction handlers (breaks circular dependency)
+    this.state.setInteractionHandlers({
+      startResize: (e, id, type) => this.interactionHandler.startResize(e, id, type),
+      toggleColorPicker: (id) => this.interactionHandler.toggleColorPicker(id),
+      changeEventColor: (id, color) => this.interactionHandler.changeEventColor(id, color),
+      selectEvent: (id) => this.interactionHandler.selectEvent(id),
+      startVerticalReorder: (e, id) => this.interactionHandler.startVerticalReorder(e, id),
+    });
 
     // Setup and initialize
     this.setupEventListeners();

@@ -28,7 +28,6 @@ export class EventInteractionHandler {
     type: 'move' | 'resize-left' | 'resize-right';
   } | null = null;
   private dragStartX = 0;
-  private selectedEventId: number | null = null;
 
   constructor(
     private eventsContainer: HTMLElement,
@@ -84,14 +83,16 @@ export class EventInteractionHandler {
    * Selects an event.
    */
   selectEvent(id: number): void {
-    if (this.selectedEventId !== null) {
+    const currentSelectedId = this.eventStateProvider.getSelectedEventId();
+
+    if (currentSelectedId !== null) {
       const prevWrapper = this.eventsContainer.querySelector(
-        `[data-id="${this.selectedEventId}"]`,
+        `[data-id="${currentSelectedId}"]`,
       );
       prevWrapper?.classList.remove('selected');
     }
 
-    this.selectedEventId = id;
+    this.eventStateProvider.setSelectedEventId(id);
     const wrapper = this.eventsContainer.querySelector(`[data-id="${id}"]`);
     wrapper?.classList.add('selected');
   }
@@ -147,7 +148,7 @@ export class EventInteractionHandler {
   }
 
   getSelectedEventId(): number | null {
-    return this.selectedEventId;
+    return this.eventStateProvider.getSelectedEventId();
   }
 
 
@@ -355,12 +356,13 @@ export class EventInteractionHandler {
       });
     }
 
-    if (!target.closest('.timeline-event') && this.selectedEventId !== null) {
+    const selectedId = this.eventStateProvider.getSelectedEventId();
+    if (!target.closest('.timeline-event') && selectedId !== null) {
       const prevWrapper = this.eventsContainer.querySelector(
-        `[data-id="${this.selectedEventId}"]`,
+        `[data-id="${selectedId}"]`,
       );
       prevWrapper?.classList.remove('selected');
-      this.selectedEventId = null;
+      this.eventStateProvider.setSelectedEventId(null);
     }
   }
 }

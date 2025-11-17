@@ -11,9 +11,19 @@ import {
 import { snapToEndOfMonth } from '../utils';
 import { downloadTimelineAsImage, findEventWrapper, openBreaksDialog } from '../dom';
 import { EventRenderer } from './EventRenderer';
-import { EventInteractionHandler } from './EventInteractionHandler';
 import { TimelineConfig } from './TimelineConfig';
 import { EventStateProvider } from './EventStateProvider';
+
+/**
+ * Interaction handler callbacks for event rendering.
+ */
+export interface InteractionHandlers {
+  startResize: (e: MouseEvent, id: number, type: 'resize-left' | 'resize-right') => void;
+  toggleColorPicker: (id: number) => void;
+  changeEventColor: (id: number, color: string) => void;
+  selectEvent: (id: number) => void;
+  startVerticalReorder: (e: MouseEvent, id: number) => void;
+}
 
 /**
  * Manages the state of timeline events and coordinates between components.
@@ -22,14 +32,35 @@ import { EventStateProvider } from './EventStateProvider';
 export class TimelineState implements EventStateProvider {
   private events: TimelineEvent[] = [];
   private nextId = 1;
+  private selectedEventId: number | null = null;
+  private interactionHandlers?: InteractionHandlers;
 
   constructor(
     private eventsContainer: HTMLElement,
     private config: TimelineConfig,
     private renderer: EventRenderer,
-    private interactionHandler: EventInteractionHandler,
-  ) {
-    // No need to wire up callbacks anymore - handler uses interface methods
+  ) {}
+
+  /**
+   * Set interaction handlers after EventInteractionHandler is created.
+   * This breaks the circular dependency.
+   */
+  setInteractionHandlers(handlers: InteractionHandlers): void {
+    this.interactionHandlers = handlers;
+  }
+
+  /**
+   * Get the currently selected event ID.
+   */
+  getSelectedEventId(): number | null {
+    return this.selectedEventId;
+  }
+
+  /**
+   * Set the currently selected event ID.
+   */
+  setSelectedEventId(id: number | null): void {
+    this.selectedEventId = id;
   }
 
   /**
@@ -123,7 +154,7 @@ export class TimelineState implements EventStateProvider {
     const oldWrapper = this.eventsContainer.querySelector(
       `[data-id="${id}"]`,
     ) as HTMLElement;
-    const wasSelected = this.interactionHandler.getSelectedEventId() === id;
+    const wasSelected = this.selectedEventId === id;
     const nextSibling = oldWrapper?.nextElementSibling;
 
     if (event.endDate === null) {
@@ -199,7 +230,7 @@ export class TimelineState implements EventStateProvider {
   async downloadAsImage(): Promise<void> {
     await downloadTimelineAsImage(
       '.timeline-container',
-      this.interactionHandler.getSelectedEventId(),
+      this.selectedEventId,
     );
   }
 
@@ -242,19 +273,19 @@ export class TimelineState implements EventStateProvider {
         this.saveEvents();
       },
       onResizeLeft: (e) =>
-        this.interactionHandler.startResize(e, event.id, 'resize-left'),
+        this.interactionHandlers?.startResize(e, event.id, 'resize-left'),
       onResizeRight: (e) =>
-        this.interactionHandler.startResize(e, event.id, 'resize-right'),
+        this.interactionHandlers?.startResize(e, event.id, 'resize-right'),
       onToggleEndDate: (e) => {
         e.stopPropagation();
         this.toggleEndDate(event.id);
       },
       onToggleColorPicker: (e) => {
         e.stopPropagation();
-        this.interactionHandler.toggleColorPicker(event.id);
+        this.interactionHandlers?.toggleColorPicker(event.id);
       },
       onChangeColor: (color) => {
-        this.interactionHandler.changeEventColor(event.id, color);
+        this.interactionHandlers?.changeEventColor(event.id, color);
       },
       onDelete: (e) => {
         e.stopPropagation();
@@ -266,10 +297,10 @@ export class TimelineState implements EventStateProvider {
       },
       onSelect: (e) => {
         e.stopPropagation();
-        this.interactionHandler.selectEvent(event.id);
+        this.interactionHandlers?.selectEvent(event.id);
       },
       onStartVerticalReorder: (e) => {
-        this.interactionHandler.startVerticalReorder(e, event.id);
+        this.interactionHandlers?.startVerticalReorder(e, event.id);
       },
     });
   }
