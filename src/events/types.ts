@@ -11,4 +11,3 @@ export interface TimelineEvent {
   color: string;
   breaks: Break[];
 }
-

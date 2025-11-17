@@ -1,6 +1,5 @@
-import { TimelineEvent } from '../events/types';
-import { formatDateRange, calculateDuration } from '../utils/dateUtils';
-import { applyEventColor, COLOR_PALETTE } from '../utils/colorUtils';
+import { TimelineEvent } from '../events';
+import { applyEventColor, calculateDuration, COLOR_PALETTE, formatDateRange } from '../utils';
 
 /**
  * Creates a timeline event wrapper with all its UI components.
@@ -61,7 +60,10 @@ export function createEventElement(
   eventEl.appendChild(rightHandle);
 
   // Buttons
-  const clearEndBtn = createClearEndButton(event.endDate, handlers.onToggleEndDate);
+  const clearEndBtn = createClearEndButton(
+    event.endDate,
+    handlers.onToggleEndDate,
+  );
   const colorBtn = createColorButton(handlers.onToggleColorPicker);
   const breaksBtn = createBreaksButton(handlers.onOpenBreaks);
   const deleteBtn = createDeleteButton(handlers.onDelete);
@@ -138,7 +140,10 @@ function createEditableNameElement(
 /**
  * Creates a dates display element.
  */
-function createDatesElement(dateRangeText: string, durationText: string): HTMLElement {
+function createDatesElement(
+  dateRangeText: string,
+  durationText: string,
+): HTMLElement {
   const datesEl = document.createElement('span');
   datesEl.className = 'timeline-event-dates';
   datesEl.innerHTML = `${dateRangeText}<br><span class="duration">${durationText}</span>`;
@@ -148,7 +153,10 @@ function createDatesElement(dateRangeText: string, durationText: string): HTMLEl
 /**
  * Creates a resize handle element.
  */
-function createResizeHandle(side: 'left' | 'right', onMouseDown: (e: MouseEvent) => void): HTMLElement {
+function createResizeHandle(
+  side: 'left' | 'right',
+  onMouseDown: (e: MouseEvent) => void,
+): HTMLElement {
   const handle = document.createElement('div');
   handle.className = `timeline-event-handle ${side}`;
   handle.addEventListener('mousedown', onMouseDown);
@@ -158,7 +166,10 @@ function createResizeHandle(side: 'left' | 'right', onMouseDown: (e: MouseEvent)
 /**
  * Creates a clear end date button.
  */
-function createClearEndButton(endDate: Date | null, onClick: (e: MouseEvent) => void): HTMLElement {
+function createClearEndButton(
+  endDate: Date | null,
+  onClick: (e: MouseEvent) => void,
+): HTMLElement {
   const btn = document.createElement('button');
   btn.className = 'clear-end-button';
   btn.textContent = endDate === null ? '📅' : '∞';
@@ -205,10 +216,13 @@ function createDeleteButton(onClick: (e: MouseEvent) => void): HTMLElement {
 /**
  * Creates a color picker dropdown.
  */
-function createColorPicker(currentColor: string, onColorChange: (color: string) => void): HTMLElement {
+function createColorPicker(
+  currentColor: string,
+  onColorChange: (color: string) => void,
+): HTMLElement {
   const colorPicker = document.createElement('div');
   colorPicker.className = 'color-picker';
-  
+
   COLOR_PALETTE.forEach((color) => {
     const colorOption = document.createElement('div');
     colorOption.className = 'color-option';
@@ -231,7 +245,9 @@ function createColorPicker(currentColor: string, onColorChange: (color: string) 
  */
 export function renderBreaks(eventEl: HTMLElement, event: TimelineEvent): void {
   // Remove existing break overlays
-  eventEl.querySelectorAll('.timeline-event-break').forEach((el) => el.remove());
+  eventEl
+    .querySelectorAll('.timeline-event-break')
+    .forEach((el) => el.remove());
 
   if (!event.breaks || event.breaks.length === 0) return;
 
@@ -253,8 +269,10 @@ export function renderBreaks(eventEl: HTMLElement, event: TimelineEvent): void {
       const effectiveBreakEnd = Math.min(breakEnd, eventEnd);
 
       // Calculate position and width as percentage of event bar
-      const leftPercent = ((effectiveBreakStart - eventStart) / eventDuration) * 100;
-      const widthPercent = ((effectiveBreakEnd - effectiveBreakStart) / eventDuration) * 100;
+      const leftPercent =
+        ((effectiveBreakStart - eventStart) / eventDuration) * 100;
+      const widthPercent =
+        ((effectiveBreakEnd - effectiveBreakStart) / eventDuration) * 100;
 
       const breakEl = document.createElement('div');
       breakEl.className = 'timeline-event-break';
@@ -266,4 +284,3 @@ export function renderBreaks(eventEl: HTMLElement, event: TimelineEvent): void {
     }
   });
 }
-

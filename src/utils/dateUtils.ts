@@ -1,4 +1,4 @@
-import { Break } from '../events/types';
+import { Break } from '../events';
 
 /**
  * Converts a timestamp to a non-linear position (0-1) with zoom factor applied.
@@ -8,7 +8,7 @@ export function timeToZoomedPosition(
   timestamp: number,
   timelineStart: Date,
   timelineEnd: Date,
-  zoomFactor: number
+  zoomFactor: number,
 ): number {
   const timelineSpan = timelineEnd.getTime() - timelineStart.getTime();
   const offset = timestamp - timelineStart.getTime();
@@ -37,7 +37,7 @@ export function zoomedPositionToTime(
   zoomedPosition: number,
   timelineStart: Date,
   timelineEnd: Date,
-  zoomFactor: number
+  zoomFactor: number,
 ): number {
   const timelineSpan = timelineEnd.getTime() - timelineStart.getTime();
 
@@ -60,18 +60,30 @@ export function zoomedPositionToTime(
  * Formats a date range as a string.
  */
 export function formatDateRange(start: Date, end: Date | null): string {
-  const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const startStr = start.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
   if (end === null) {
     return `${startStr} - Present`;
   }
-  const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const endStr = end.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
   return `${startStr} - ${endStr}`;
 }
 
 /**
  * Calculates the duration between two dates, accounting for breaks.
  */
-export function calculateDuration(start: Date, end: Date | null, breaks: Break[] = []): string {
+export function calculateDuration(
+  start: Date,
+  end: Date | null,
+  breaks: Break[] = [],
+): string {
   const effectiveEnd = end || new Date();
 
   // Calculate total duration in milliseconds
@@ -81,12 +93,14 @@ export function calculateDuration(start: Date, end: Date | null, breaks: Break[]
   for (const breakPeriod of breaks) {
     const breakStart = new Date(breakPeriod.startDate);
     const breakEnd = new Date(breakPeriod.endDate);
-    
+
     // Only count breaks that are within the event period
     if (breakStart < effectiveEnd && breakEnd > start) {
       const effectiveBreakStart = breakStart < start ? start : breakStart;
-      const effectiveBreakEnd = breakEnd > effectiveEnd ? effectiveEnd : breakEnd;
-      const breakDuration = effectiveBreakEnd.getTime() - effectiveBreakStart.getTime();
+      const effectiveBreakEnd =
+        breakEnd > effectiveEnd ? effectiveEnd : breakEnd;
+      const breakDuration =
+        effectiveBreakEnd.getTime() - effectiveBreakStart.getTime();
       totalMs -= breakDuration;
     }
   }
@@ -136,4 +150,3 @@ export function snapToEndOfMonth(date: Date): Date {
   snapped.setHours(23, 59, 59, 999);
   return snapped;
 }
-

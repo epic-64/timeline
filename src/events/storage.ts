@@ -1,20 +1,20 @@
 import { TimelineEvent } from './types';
-import { COLOR_PALETTE } from '../utils/colorUtils';
+import { COLOR_PALETTE } from '../utils';
 
 /**
  * Serializes events to JSON format for storage.
  */
 export function serializeEvents(events: TimelineEvent[]): string {
-  const eventsData = events.map(event => ({
+  const eventsData = events.map((event) => ({
     id: event.id,
     name: event.name,
     startDate: event.startDate.toISOString(),
     endDate: event.endDate ? event.endDate.toISOString() : null,
     color: event.color,
-    breaks: event.breaks.map(b => ({
+    breaks: event.breaks.map((b) => ({
       startDate: b.startDate.toISOString(),
-      endDate: b.endDate.toISOString()
-    }))
+      endDate: b.endDate.toISOString(),
+    })),
   }));
   return JSON.stringify(eventsData);
 }
@@ -30,17 +30,22 @@ export function deserializeEvents(jsonString: string): TimelineEvent[] {
     startDate: new Date(data.startDate),
     endDate: data.endDate ? new Date(data.endDate) : null,
     color: data.color || COLOR_PALETTE[0],
-    breaks: data.breaks ? data.breaks.map((b: any) => ({
-      startDate: new Date(b.startDate),
-      endDate: new Date(b.endDate)
-    })) : []
+    breaks: data.breaks
+      ? data.breaks.map((b: any) => ({
+          startDate: new Date(b.startDate),
+          endDate: new Date(b.endDate),
+        }))
+      : [],
   }));
 }
 
 /**
  * Saves events to localStorage.
  */
-export function saveEventsToLocalStorage(events: TimelineEvent[], nextId: number): void {
+export function saveEventsToLocalStorage(
+  events: TimelineEvent[],
+  nextId: number,
+): void {
   const serialized = serializeEvents(events);
   localStorage.setItem('timelineEvents', serialized);
   localStorage.setItem('timelineNextId', nextId.toString());
@@ -49,7 +54,10 @@ export function saveEventsToLocalStorage(events: TimelineEvent[], nextId: number
 /**
  * Loads events from localStorage.
  */
-export function loadEventsFromLocalStorage(): { events: TimelineEvent[]; nextId: number } {
+export function loadEventsFromLocalStorage(): {
+  events: TimelineEvent[];
+  nextId: number;
+} {
   const storedEvents = localStorage.getItem('timelineEvents');
   const storedNextId = localStorage.getItem('timelineNextId');
 
@@ -93,7 +101,10 @@ export function exportEventsToFile(events: TimelineEvent[]): void {
  * Imports events from a file upload.
  * Returns a promise that resolves with the imported events and the new nextId.
  */
-export function importEventsFromFile(): Promise<{ events: TimelineEvent[]; nextId: number }> {
+export function importEventsFromFile(): Promise<{
+  events: TimelineEvent[];
+  nextId: number;
+}> {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -113,7 +124,7 @@ export function importEventsFromFile(): Promise<{ events: TimelineEvent[]; nextI
           const events = deserializeEvents(jsonString);
 
           // Calculate nextId to be higher than any imported id
-          const maxId = Math.max(...events.map(e => e.id), 0);
+          const maxId = Math.max(...events.map((e) => e.id), 0);
           const nextId = maxId + 1;
 
           resolve({ events, nextId });
@@ -129,4 +140,3 @@ export function importEventsFromFile(): Promise<{ events: TimelineEvent[]; nextI
     input.click();
   });
 }
-

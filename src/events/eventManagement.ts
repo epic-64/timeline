@@ -1,5 +1,5 @@
 import { TimelineEvent } from './types';
-import { COLOR_PALETTE } from '../utils/colorUtils';
+import { COLOR_PALETTE } from '../utils';
 
 /**
  * Creates a new timeline event with default values.
@@ -57,7 +57,7 @@ export function updateEventOrder(
   orderedIds: number[],
 ): TimelineEvent[] {
   const newOrder: TimelineEvent[] = [];
-  
+
   orderedIds.forEach((id) => {
     const event = events.find((e) => e.id === id);
     if (event) {
@@ -77,4 +77,3 @@ export function isShortEvent(event: TimelineEvent): boolean {
   const twoYearsInMs = 2 * 365.25 * 24 * 60 * 60 * 1000;
   return eventDuration < twoYearsInMs;
 }
-

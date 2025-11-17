@@ -42,9 +42,7 @@ export async function downloadTimelineAsImage(
 
     // Restore selected state
     if (selectedEventId !== null) {
-      const wrapper = document.querySelector(
-        `[data-id="${selectedEventId}"]`,
-      );
+      const wrapper = document.querySelector(`[data-id="${selectedEventId}"]`);
       wrapper?.classList.add('selected');
     }
 
@@ -73,11 +71,8 @@ export async function downloadTimelineAsImage(
 
     // Restore selected state
     if (selectedEventId !== null) {
-      const wrapper = document.querySelector(
-        `[data-id="${selectedEventId}"]`,
-      );
+      const wrapper = document.querySelector(`[data-id="${selectedEventId}"]`);
       wrapper?.classList.add('selected');
     }
   }
 }
-

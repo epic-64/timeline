@@ -31,9 +31,7 @@ export function getAllEventWrappers(container: HTMLElement): HTMLElement[] {
 /**
  * Extracts event IDs from wrapper elements in order.
  */
-export function extractEventIdsFromWrappers(
-  wrappers: HTMLElement[],
-): number[] {
+export function extractEventIdsFromWrappers(wrappers: HTMLElement[]): number[] {
   return wrappers.map((w) => parseInt(w.dataset.id || '0', 10));
 }
 
@@ -110,7 +108,7 @@ export function findDateDisplayElements(
   const externalDatesEl = wrapper.querySelector(
     '.timeline-event-dates-external',
   ) as HTMLElement;
-  
+
   return { datesEl, externalDatesEl };
 }
 
@@ -129,4 +127,3 @@ export function updateDateDisplays(
     externalDatesEl.innerHTML = htmlContent;
   }
 }
-
