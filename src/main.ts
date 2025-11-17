@@ -1,4 +1,3 @@
-import html2canvas from 'html2canvas';
 import { TimelineEvent } from './types';
 import {
   calculateDuration,
@@ -15,6 +14,9 @@ import {
   loadEventsFromLocalStorage,
   saveEventsToLocalStorage,
 } from './storage';
+import { createEventElement, renderBreaks } from './domUtils';
+import { openBreaksDialog } from './breaksDialog';
+import { downloadTimelineAsImage } from './imageExport';
 
 class Timeline {
   private events: TimelineEvent[] = [];
@@ -188,174 +190,41 @@ class Timeline {
   }
 
   private renderEvent(event: TimelineEvent) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'timeline-event-wrapper';
-    wrapper.dataset.id = event.id.toString();
-
-    // External date label (for short events)
-    const externalDatesEl = document.createElement('span');
-    externalDatesEl.className = 'timeline-event-dates-external';
-    const dateRangeText = formatDateRange(event.startDate, event.endDate);
-    const durationText = calculateDuration(event.startDate, event.endDate);
-    externalDatesEl.innerHTML = `${dateRangeText}<br><span class="duration">${durationText}</span>`;
-
-    const eventEl = document.createElement('div');
-    eventEl.className = 'timeline-event';
-    eventEl.dataset.color = event.color;
-
-    // Apply color to event
-    applyEventColor(eventEl, event.color);
-
-    // Mark as open-ended if no end date
-    if (event.endDate === null) {
-      eventEl.classList.add('open-ended');
-    }
-
-    const content = document.createElement('div');
-    content.className = 'timeline-event-content';
-
-    const nameEl = document.createElement('span');
-    nameEl.className = 'timeline-event-name';
-    nameEl.textContent = event.name;
-    nameEl.contentEditable = 'false';
-
-    // Make editable only when clicked
-    nameEl.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (nameEl.contentEditable === 'false') {
-        nameEl.contentEditable = 'true';
-        nameEl.focus();
-        // Move cursor to the end
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(nameEl);
-        range.collapse(false); // false = collapse to end
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      }
-    });
-
-    nameEl.addEventListener('blur', (e) => {
-      nameEl.contentEditable = 'false';
-      event.name = (e.target as HTMLElement).textContent || event.name;
-      this.saveEvents();
-    });
-
-    nameEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        (e.target as HTMLElement).blur();
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        nameEl.textContent = event.name; // Restore original text
-        (e.target as HTMLElement).blur();
-      }
-    });
-
-    const datesEl = document.createElement('span');
-    datesEl.className = 'timeline-event-dates';
-    datesEl.innerHTML = `${dateRangeText}<br><span class="duration">${durationText}</span>`;
-
-    content.appendChild(nameEl);
-    content.appendChild(datesEl);
-
-    // Resize handles
-    const leftHandle = document.createElement('div');
-    leftHandle.className = 'timeline-event-handle left';
-    leftHandle.addEventListener('mousedown', (e) =>
-      this.startResize(e, event.id, 'resize-left'),
-    );
-
-    const rightHandle = document.createElement('div');
-    rightHandle.className = 'timeline-event-handle right';
-    rightHandle.addEventListener('mousedown', (e) =>
-      this.startResize(e, event.id, 'resize-right'),
-    );
-
-    eventEl.appendChild(leftHandle);
-    eventEl.appendChild(content);
-    eventEl.appendChild(rightHandle);
-
-    // Clear end date button
-    const clearEndBtn = document.createElement('button');
-    clearEndBtn.className = 'clear-end-button';
-    clearEndBtn.textContent = event.endDate === null ? '📅' : '∞';
-    clearEndBtn.title =
-      event.endDate === null ? 'Set End Date' : 'Clear End Date (Ongoing)';
-    clearEndBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggleEndDate(event.id);
-    });
-
-    // Color picker button
-    const colorBtn = document.createElement('button');
-    colorBtn.className = 'color-button';
-    colorBtn.textContent = '🎨';
-    colorBtn.title = 'Change Color';
-    colorBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggleColorPicker(event.id);
-    });
-
-    // Color picker dropdown
-    const colorPicker = document.createElement('div');
-    colorPicker.className = 'color-picker';
-    COLOR_PALETTE.forEach((color) => {
-      const colorOption = document.createElement('div');
-      colorOption.className = 'color-option';
-      colorOption.style.backgroundColor = color;
-      if (color === event.color) {
-        colorOption.classList.add('selected');
-      }
-      colorOption.addEventListener('click', (e) => {
+    const wrapper = createEventElement(event, {
+      onNameEdit: (newName) => {
+        event.name = newName;
+        this.saveEvents();
+      },
+      onResizeLeft: (e) => this.startResize(e, event.id, 'resize-left'),
+      onResizeRight: (e) => this.startResize(e, event.id, 'resize-right'),
+      onToggleEndDate: (e) => {
         e.stopPropagation();
-        this.changeEventColor(event.id, color);
-      });
-      colorPicker.appendChild(colorOption);
+        this.toggleEndDate(event.id);
+      },
+      onToggleColorPicker: (e) => {
+        e.stopPropagation();
+        this.toggleColorPicker(event.id);
+      },
+      onChangeColor: (color) => this.changeEventColor(event.id, color),
+      onDelete: (e) => {
+        e.stopPropagation();
+        this.deleteEvent(event.id);
+      },
+      onOpenBreaks: (e) => {
+        e.stopPropagation();
+        this.openBreaksDialog(event.id);
+      },
+      onSelect: (e) => {
+        e.stopPropagation();
+        this.selectEvent(event.id);
+      },
+      onStartVerticalReorder: (e) => this.startVerticalReorder(e, event.id),
     });
-
-    // Delete button (outside the event)
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'delete-button';
-    deleteBtn.textContent = '×';
-    deleteBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.deleteEvent(event.id);
-    });
-
-    // Breaks button
-    const breaksBtn = document.createElement('button');
-    breaksBtn.className = 'breaks-button';
-    breaksBtn.textContent = '⏸';
-    breaksBtn.title = 'Manage Breaks';
-    breaksBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.openBreaksDialog(event.id);
-    });
-
-    wrapper.appendChild(externalDatesEl);
-    wrapper.appendChild(eventEl);
-    wrapper.appendChild(colorPicker);
-    wrapper.appendChild(colorBtn);
-    wrapper.appendChild(clearEndBtn);
-    wrapper.appendChild(breaksBtn);
-    wrapper.appendChild(deleteBtn);
-
-    // Click to select - only when clicking on the event element itself
-    eventEl.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.selectEvent(event.id);
-    });
-
-    // Drag to reorder vertically only
-    content.addEventListener('mousedown', (e) =>
-      this.startVerticalReorder(e, event.id),
-    );
 
     this.eventsContainer.appendChild(wrapper);
 
     // Now update position after wrapper is in DOM
+    const eventEl = wrapper.querySelector('.timeline-event') as HTMLElement;
     this.updateEventPosition(wrapper, eventEl, event);
   }
 
@@ -391,7 +260,7 @@ class Timeline {
     wrapper.style.setProperty('--event-left', `${Math.max(leftPercent, 0)}%`);
 
     // Render breaks as overlays
-    this.renderBreaks(eventEl, event);
+    renderBreaks(eventEl, event);
 
     // Determine if event is short (less than 2 years)
     const eventDuration =
@@ -717,209 +586,12 @@ class Timeline {
     this.saveEvents();
   }
 
-  private renderBreaks(eventEl: HTMLElement, event: TimelineEvent) {
-    // Remove existing break overlays
-    eventEl
-      .querySelectorAll('.timeline-event-break')
-      .forEach((el) => el.remove());
-
-    if (!event.breaks || event.breaks.length === 0) return;
-
-    const effectiveEndDate = event.endDate || new Date();
-    const eventStart = event.startDate.getTime();
-    const eventEnd = effectiveEndDate.getTime();
-    const eventDuration = eventEnd - eventStart;
-
-    if (eventDuration <= 0) return;
-
-    // Render each break as an overlay
-    event.breaks.forEach((breakPeriod) => {
-      const breakStart = new Date(breakPeriod.startDate).getTime();
-      const breakEnd = new Date(breakPeriod.endDate).getTime();
-
-      // Only render breaks that are within the event period
-      if (breakStart < eventEnd && breakEnd > eventStart) {
-        const effectiveBreakStart = Math.max(breakStart, eventStart);
-        const effectiveBreakEnd = Math.min(breakEnd, eventEnd);
-
-        // Calculate position and width as percentage of event bar
-        const leftPercent =
-          ((effectiveBreakStart - eventStart) / eventDuration) * 100;
-        const widthPercent =
-          ((effectiveBreakEnd - effectiveBreakStart) / eventDuration) * 100;
-
-        const breakEl = document.createElement('div');
-        breakEl.className = 'timeline-event-break';
-        breakEl.style.left = `${leftPercent}%`;
-        breakEl.style.width = `${widthPercent}%`;
-        breakEl.title = `Break: ${new Date(breakPeriod.startDate).toLocaleDateString()} - ${new Date(breakPeriod.endDate).toLocaleDateString()}`;
-
-        eventEl.appendChild(breakEl);
-      }
-    });
-  }
 
   private openBreaksDialog(id: number) {
     const event = this.events.find((e) => e.id === id);
     if (!event) return;
 
-    // Create modal backdrop
-    const backdrop = document.createElement('div');
-    backdrop.className = 'modal-backdrop';
-
-    // Create modal dialog
-    const dialog = document.createElement('div');
-    dialog.className = 'modal-dialog';
-
-    const title = document.createElement('h2');
-    title.textContent = `Manage Breaks - ${event.name}`;
-    dialog.appendChild(title);
-
-    // Breaks list
-    const breaksList = document.createElement('div');
-    breaksList.className = 'breaks-list';
-
-    const renderBreaksList = () => {
-      breaksList.innerHTML = '';
-
-      if (event.breaks.length === 0) {
-        const emptyMsg = document.createElement('p');
-        emptyMsg.className = 'empty-message';
-        emptyMsg.textContent = 'No breaks added yet.';
-        breaksList.appendChild(emptyMsg);
-      } else {
-        event.breaks.forEach((breakPeriod, index) => {
-          const breakItem = document.createElement('div');
-          breakItem.className = 'break-item';
-
-          const breakInfo = document.createElement('div');
-          breakInfo.className = 'break-info';
-
-          const startStr = new Date(breakPeriod.startDate).toLocaleDateString(
-            'en-US',
-            {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            },
-          );
-          const endStr = new Date(breakPeriod.endDate).toLocaleDateString(
-            'en-US',
-            {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            },
-          );
-
-          breakInfo.textContent = `${startStr} - ${endStr}`;
-
-          const deleteBtn = document.createElement('button');
-          deleteBtn.className = 'break-delete-btn';
-          deleteBtn.textContent = '×';
-          deleteBtn.addEventListener('click', () => {
-            event.breaks.splice(index, 1);
-            renderBreaksList();
-            this.updateEventAfterBreaksChange(id);
-          });
-
-          breakItem.appendChild(breakInfo);
-          breakItem.appendChild(deleteBtn);
-          breaksList.appendChild(breakItem);
-        });
-      }
-    };
-
-    renderBreaksList();
-    dialog.appendChild(breaksList);
-
-    // Add break form
-    const addBreakForm = document.createElement('div');
-    addBreakForm.className = 'add-break-form';
-
-    const formTitle = document.createElement('h3');
-    formTitle.textContent = 'Add New Break';
-    addBreakForm.appendChild(formTitle);
-
-    const startLabel = document.createElement('label');
-    startLabel.textContent = 'Start Date:';
-    const startInput = document.createElement('input');
-    startInput.type = 'date';
-    startInput.className = 'break-date-input';
-    startLabel.appendChild(startInput);
-
-    const endLabel = document.createElement('label');
-    endLabel.textContent = 'End Date:';
-    const endInput = document.createElement('input');
-    endInput.type = 'date';
-    endInput.className = 'break-date-input';
-    endLabel.appendChild(endInput);
-
-    const addBtn = document.createElement('button');
-    addBtn.textContent = 'Add Break';
-    addBtn.className = 'add-break-btn';
-    addBtn.addEventListener('click', () => {
-      const startDate = startInput.value;
-      const endDate = endInput.value;
-
-      if (!startDate || !endDate) {
-        alert('Please enter both start and end dates.');
-        return;
-      }
-
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-
-      if (start >= end) {
-        alert('End date must be after start date.');
-        return;
-      }
-
-      // Validate that break is within event period
-      const eventEnd = event.endDate || new Date();
-      if (start < event.startDate || end > eventEnd) {
-        alert('Break must be within the event period.');
-        return;
-      }
-
-      event.breaks.push({ startDate: start, endDate: end });
-
-      // Sort breaks by start date
-      event.breaks.sort(
-        (a, b) => a.startDate.getTime() - b.startDate.getTime(),
-      );
-
-      renderBreaksList();
-      this.updateEventAfterBreaksChange(id);
-
-      // Clear inputs
-      startInput.value = '';
-      endInput.value = '';
-    });
-
-    addBreakForm.appendChild(startLabel);
-    addBreakForm.appendChild(endLabel);
-    addBreakForm.appendChild(addBtn);
-    dialog.appendChild(addBreakForm);
-
-    // Close button
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = 'Close';
-    closeBtn.className = 'modal-close-btn';
-    closeBtn.addEventListener('click', () => {
-      backdrop.remove();
-    });
-    dialog.appendChild(closeBtn);
-
-    backdrop.appendChild(dialog);
-    document.body.appendChild(backdrop);
-
-    // Close on backdrop click
-    backdrop.addEventListener('click', (e) => {
-      if (e.target === backdrop) {
-        backdrop.remove();
-      }
-    });
+    openBreaksDialog(event, () => this.updateEventAfterBreaksChange(id));
   }
 
   private updateEventAfterBreaksChange(id: number) {
@@ -1069,77 +741,7 @@ class Timeline {
   }
 
   private async downloadAsImage() {
-    const timelineContainer = document.querySelector(
-      '.timeline-container',
-    ) as HTMLElement;
-    if (!timelineContainer) {
-      alert('Timeline not found!');
-      return;
-    }
-
-    try {
-      // Hide UI elements that shouldn't be in the image
-      const elementsToHide = timelineContainer.querySelectorAll(
-        '.delete-button, .color-button, .clear-end-button, .color-picker, .timeline-event-handle',
-      );
-      elementsToHide.forEach(
-        (el) => ((el as HTMLElement).style.display = 'none'),
-      );
-
-      // Remove selected state temporarily
-      const selectedElements = timelineContainer.querySelectorAll('.selected');
-      selectedElements.forEach((el) => el.classList.remove('selected'));
-
-      // Capture the timeline
-      const canvas = await html2canvas(timelineContainer, {
-        backgroundColor: '#000000',
-        scale: 2, // Higher resolution
-        logging: false,
-        useCORS: true,
-      });
-
-      // Restore hidden elements
-      elementsToHide.forEach((el) => ((el as HTMLElement).style.display = ''));
-
-      // Restore selected state
-      if (this.selectedEventId !== null) {
-        const wrapper = this.eventsContainer.querySelector(
-          `[data-id="${this.selectedEventId}"]`,
-        );
-        wrapper?.classList.add('selected');
-      }
-
-      // Convert canvas to blob and download
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `timeline-${new Date().toISOString().split('T')[0]}.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        }
-      }, 'image/png');
-    } catch (error) {
-      console.error('Failed to download image:', error);
-      alert('Failed to download image. Please try again.');
-
-      // Restore hidden elements in case of error
-      const elementsToHide = timelineContainer.querySelectorAll(
-        '.delete-button, .color-button, .clear-end-button, .color-picker, .timeline-event-handle',
-      );
-      elementsToHide.forEach((el) => ((el as HTMLElement).style.display = ''));
-
-      // Restore selected state
-      if (this.selectedEventId !== null) {
-        const wrapper = this.eventsContainer.querySelector(
-          `[data-id="${this.selectedEventId}"]`,
-        );
-        wrapper?.classList.add('selected');
-      }
-    }
+    await downloadTimelineAsImage('.timeline-container', this.selectedEventId);
   }
 }
 
