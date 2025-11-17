@@ -1,6 +1,7 @@
 import { EventInteractionHandler } from '../EventInteractionHandler';
 import { EventRenderer } from '../EventRenderer';
 import { TimelineEvent } from '../../events/types';
+import { EventStateProvider } from '../EventStateProvider';
 
 describe('EventInteractionHandler', () => {
   let container: HTMLElement;
@@ -9,6 +10,7 @@ describe('EventInteractionHandler', () => {
   let mockGetTimelineParams: jest.Mock;
   let mockOnEventsChange: jest.Mock;
   let mockEvents: TimelineEvent[];
+  let mockStateProvider: EventStateProvider;
 
   beforeEach(() => {
     // Setup DOM
@@ -25,13 +27,6 @@ describe('EventInteractionHandler', () => {
     mockOnEventsChange = jest.fn();
 
     renderer = new EventRenderer(container, mockGetTimelineParams);
-
-    handler = new EventInteractionHandler(
-      container,
-      renderer,
-      mockGetTimelineParams,
-      mockOnEventsChange,
-    );
 
     // Setup mock events
     mockEvents = [
@@ -53,9 +48,26 @@ describe('EventInteractionHandler', () => {
       },
     ];
 
-    // Inject dependencies using setters (current implementation)
-    handler.setGetEvents(() => mockEvents);
-    handler.setUpdateEventsOrderFromDOM(jest.fn());
+    // Create mock state provider
+    mockStateProvider = {
+      getEventById: jest.fn((id: number) => mockEvents.find(e => e.id === id)),
+      getAllEvents: jest.fn(() => mockEvents),
+      updateEvent: jest.fn((id: number, updates: Partial<TimelineEvent>) => {
+        const event = mockEvents.find(e => e.id === id);
+        if (event) {
+          Object.assign(event, updates);
+        }
+      }),
+      reorderEventsFromDOM: jest.fn(),
+    };
+
+    handler = new EventInteractionHandler(
+      container,
+      renderer,
+      mockStateProvider,
+      mockGetTimelineParams,
+      mockOnEventsChange,
+    );
   });
 
   afterEach(() => {
@@ -116,9 +128,9 @@ describe('EventInteractionHandler', () => {
         </div>
       `;
 
-      handler.changeEventColor(mockEvents, 1, '#FF0000');
+      handler.changeEventColor(1, '#FF0000');
 
-      expect(mockEvents[0].color).toBe('#FF0000');
+      expect(mockStateProvider.updateEvent).toHaveBeenCalledWith(1, { color: '#FF0000' });
       expect(mockOnEventsChange).toHaveBeenCalledTimes(1);
 
       const eventEl = container.querySelector('.timeline-event') as HTMLElement;
@@ -126,7 +138,7 @@ describe('EventInteractionHandler', () => {
     });
 
     it('should handle non-existent event gracefully', () => {
-      handler.changeEventColor(mockEvents, 999, '#FF0000');
+      handler.changeEventColor(999, '#FF0000');
       expect(mockOnEventsChange).not.toHaveBeenCalled();
     });
   });

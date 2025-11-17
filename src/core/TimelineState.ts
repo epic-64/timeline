@@ -13,11 +13,13 @@ import { downloadTimelineAsImage, findEventWrapper, openBreaksDialog } from '../
 import { EventRenderer } from './EventRenderer';
 import { EventInteractionHandler } from './EventInteractionHandler';
 import { TimelineConfig } from './TimelineConfig';
+import { EventStateProvider } from './EventStateProvider';
 
 /**
  * Manages the state of timeline events and coordinates between components.
+ * Implements EventStateProvider to provide event state to interaction handler.
  */
-export class TimelineState {
+export class TimelineState implements EventStateProvider {
   private events: TimelineEvent[] = [];
   private nextId = 1;
 
@@ -27,11 +29,7 @@ export class TimelineState {
     private renderer: EventRenderer,
     private interactionHandler: EventInteractionHandler,
   ) {
-    // Wire up callbacks
-    this.interactionHandler.setGetEvents(() => this.events);
-    this.interactionHandler.setUpdateEventsOrderFromDOM(() =>
-      this.updateEventsOrderFromDOM(),
-    );
+    // No need to wire up callbacks anymore - handler uses interface methods
   }
 
   /**
@@ -43,6 +41,56 @@ export class TimelineState {
     this.nextId = nextId;
 
     this.events.forEach((event) => this.renderEvent(event));
+  }
+
+  // EventStateProvider interface implementation
+
+  /**
+   * Get an event by ID.
+   */
+  getEventById(id: number): TimelineEvent | undefined {
+    console.log('getEventById called with id:', id);
+    console.log('this.events:', this.events);
+    console.log('this.events length:', this.events?.length);
+    const result = findEventById(this.events, id);
+    console.log('findEventById result:', result);
+    return result;
+  }
+
+  /**
+   * Get all events (read-only).
+   */
+  getAllEvents(): ReadonlyArray<TimelineEvent> {
+    return this.events;
+  }
+
+  /**
+   * Update an event's properties.
+   */
+  updateEvent(id: number, updates: Partial<TimelineEvent>): void {
+    const event = findEventById(this.events, id);
+    if (!event) return;
+
+    // Apply updates
+    Object.assign(event, updates);
+    this.saveEvents();
+  }
+
+  /**
+   * Reorder events based on DOM order.
+   */
+  reorderEventsFromDOM(orderedIds: number[]): void {
+    const newOrder: TimelineEvent[] = [];
+
+    orderedIds.forEach((id) => {
+      const event = findEventById(this.events, id);
+      if (event) {
+        newOrder.push(event);
+      }
+    });
+
+    this.events = newOrder;
+    this.saveEvents();
   }
 
   /**
@@ -211,7 +259,7 @@ export class TimelineState {
         this.interactionHandler.toggleColorPicker(event.id);
       },
       onChangeColor: (color) => {
-        this.interactionHandler.changeEventColor(this.events, event.id, color);
+        this.interactionHandler.changeEventColor(event.id, color);
       },
       onDelete: (e) => {
         e.stopPropagation();
@@ -229,25 +277,5 @@ export class TimelineState {
         this.interactionHandler.startVerticalReorder(e, event.id);
       },
     });
-  }
-
-  /**
-   * Updates the events array to match the DOM order after reordering.
-   */
-  private updateEventsOrderFromDOM(): void {
-    const wrappers = Array.from(
-      this.eventsContainer.querySelectorAll('.timeline-event-wrapper'),
-    ) as HTMLElement[];
-    const newOrder: TimelineEvent[] = [];
-
-    wrappers.forEach((w) => {
-      const id = parseInt(w.dataset.id || '0', 10);
-      const event = this.events.find((e) => e.id === id);
-      if (event) {
-        newOrder.push(event);
-      }
-    });
-
-    this.events = newOrder;
   }
 }

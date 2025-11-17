@@ -49,12 +49,21 @@ describe('TimelineState', () => {
     // Create dependencies
     config = new TimelineConfig(datesContainer);
     renderer = new EventRenderer(container, () => config.getTimelineParams());
+
+    // Create state first (it will be the state provider)
+    state = new TimelineState(container, config, renderer, null as any);
+
+    // Create interaction handler with state as provider
     interactionHandler = new EventInteractionHandler(
       container,
       renderer,
+      state, // Pass state as EventStateProvider
       () => config.getTimelineParams(),
       jest.fn(),
     );
+
+    // Wire up the handler back to state
+    (state as any).interactionHandler = interactionHandler;
 
     // Mock storage functions
     (storage.loadEventsFromLocalStorage as jest.Mock).mockReturnValue({
@@ -62,7 +71,8 @@ describe('TimelineState', () => {
       nextId: 3,
     });
     (storage.saveEventsToLocalStorage as jest.Mock).mockImplementation(() => {});
-    
+    (storage.exportEventsToFile as jest.Mock).mockImplementation(() => {});
+
     // Mock event management
     (eventManagement.createNewEvent as jest.Mock).mockImplementation((id) => ({
       id,
@@ -73,7 +83,15 @@ describe('TimelineState', () => {
       breaks: [],
     }));
 
-    state = new TimelineState(container, config, renderer, interactionHandler);
+    // Mock findEventById to return events from the internal events array
+    (eventManagement.findEventById as jest.Mock).mockImplementation((events, id) => {
+      return events.find((e: TimelineEvent) => e.id === id);
+    });
+
+    // Mock removeEventById to filter out the event by id
+    (eventManagement.removeEventById as jest.Mock).mockImplementation((events, id) => {
+      return events.filter((e: TimelineEvent) => e.id !== id);
+    });
   });
 
   afterEach(() => {
@@ -82,9 +100,9 @@ describe('TimelineState', () => {
   });
 
   describe('constructor', () => {
-    it('should wire up interaction handler callbacks', () => {
-      expect(interactionHandler['getEvents']).toBeDefined();
-      expect(interactionHandler['updateEventsOrderFromDOM']).toBeDefined();
+    it('should initialize state with provided dependencies', () => {
+      expect(state).toBeDefined();
+      expect(state.getAllEvents()).toEqual([]);
     });
   });
 
@@ -216,7 +234,7 @@ describe('TimelineState', () => {
     });
   });
 
-  describe('updateEventsOrderFromDOM', () => {
+  describe('reorderEventsFromDOM', () => {
     it('should reorder events array to match DOM', () => {
       state.loadEvents();
       
@@ -225,10 +243,11 @@ describe('TimelineState', () => {
         <div class="timeline-event-wrapper" data-id="1"></div>
       `;
       
-      state['updateEventsOrderFromDOM']();
+      // Use the public interface method
+      state.reorderEventsFromDOM([2, 1]);
 
       // Events should now be ordered [2, 1] instead of [1, 2]
-      const events = state['events'];
+      const events = state.getAllEvents();
       expect(events[0].id).toBe(2);
       expect(events[1].id).toBe(1);
     });

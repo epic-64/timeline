@@ -24,19 +24,25 @@ export class Timeline {
       this.config.getTimelineParams(),
     );
 
-    this.interactionHandler = new EventInteractionHandler(
-      eventsContainer,
-      this.renderer,
-      () => this.config.getTimelineParams(),
-      () => {}, // Will be set by TimelineState
-    );
-
+    // Create state first (without handler reference)
     this.state = new TimelineState(
       eventsContainer,
       this.config,
       this.renderer,
-      this.interactionHandler,
+      null as any, // Will be set after handler is created
     );
+
+    // Create interaction handler with state as provider
+    this.interactionHandler = new EventInteractionHandler(
+      eventsContainer,
+      this.renderer,
+      this.state, // Pass state as EventStateProvider
+      () => this.config.getTimelineParams(),
+      () => {}, // Will be handled by TimelineState through updateEvent
+    );
+
+    // Wire up the interaction handler in state
+    (this.state as any).interactionHandler = this.interactionHandler;
 
     // Setup and initialize
     this.setupEventListeners();

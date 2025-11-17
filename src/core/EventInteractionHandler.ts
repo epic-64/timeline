@@ -1,4 +1,4 @@
-import { findEventById, TimelineEvent } from '../events';
+import { TimelineEvent } from '../events';
 import {
   applyEventColor,
   rgbToHex,
@@ -16,9 +16,11 @@ import {
   removeClassFromElement
 } from '../dom';
 import { EventRenderer } from './EventRenderer';
+import { EventStateProvider } from './EventStateProvider';
 
 /**
  * Handles all user interactions with timeline events.
+ * Uses EventStateProvider interface to avoid bidirectional coupling.
  */
 export class EventInteractionHandler {
   private draggedEvent: {
@@ -31,6 +33,7 @@ export class EventInteractionHandler {
   constructor(
     private eventsContainer: HTMLElement,
     private eventRenderer: EventRenderer,
+    private eventStateProvider: EventStateProvider,
     private getTimelineParams: () => {
       timelineStart: Date;
       timelineEnd: Date;
@@ -109,11 +112,12 @@ export class EventInteractionHandler {
   /**
    * Changes an event's color.
    */
-  changeEventColor(events: TimelineEvent[], id: number, color: string): void {
-    const event = findEventById(events, id);
+  changeEventColor(id: number, color: string): void {
+    const event = this.eventStateProvider.getEventById(id);
     if (!event) return;
 
-    event.color = color;
+    // Update the event through the state provider
+    this.eventStateProvider.updateEvent(id, { color });
 
     const wrapper = findEventWrapper(this.eventsContainer, id);
     const eventEl = wrapper ? findEventElement(wrapper) : null;
@@ -146,13 +150,6 @@ export class EventInteractionHandler {
     return this.selectedEventId;
   }
 
-  setGetEvents(fn: () => TimelineEvent[]): void {
-    this.getEvents = fn;
-  }
-
-  setUpdateEventsOrderFromDOM(fn: () => void): void {
-    this.updateEventsOrderFromDOM = fn;
-  }
 
   private setupGlobalListeners(): void {
     document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
@@ -173,8 +170,7 @@ export class EventInteractionHandler {
   }
 
   private handleResize(e: MouseEvent): void {
-    const events = this.getEvents();
-    const event = findEventById(events, this.draggedEvent!.id);
+    const event = this.eventStateProvider.getEventById(this.draggedEvent!.id);
     if (!event) return;
 
     const { timelineStart, timelineEnd, zoomFactor } = this.getTimelineParams();
@@ -205,13 +201,13 @@ export class EventInteractionHandler {
       const newStart = new Date(newTimestamp);
       const compareDate = event.endDate || new Date();
       if (newStart < compareDate) {
-        event.startDate = newStart;
+        this.eventStateProvider.updateEvent(event.id, { startDate: newStart });
       }
     } else if (this.draggedEvent!.type === 'resize-right') {
       if (event.endDate !== null) {
         const newEnd = new Date(newTimestamp);
         if (newEnd > event.startDate) {
-          event.endDate = newEnd;
+          this.eventStateProvider.updateEvent(event.id, { endDate: newEnd });
         }
       }
     }
@@ -222,7 +218,11 @@ export class EventInteractionHandler {
       this.draggedEvent!.id,
     );
     if (wrapper && eventEl) {
-      this.eventRenderer.updateEventPosition(wrapper, eventEl, event);
+      // Get updated event to render
+      const updatedEvent = this.eventStateProvider.getEventById(this.draggedEvent!.id);
+      if (updatedEvent) {
+        this.eventRenderer.updateEventPosition(wrapper, eventEl, updatedEvent);
+      }
     }
   }
 
@@ -281,27 +281,40 @@ export class EventInteractionHandler {
     }
 
     // Handle resize end with snapping
-    const events = this.getEvents();
-    const event = findEventById(events, this.draggedEvent.id);
+    const event = this.eventStateProvider.getEventById(this.draggedEvent.id);
 
     if (event) {
+      const updates: Partial<TimelineEvent> = {};
+
       if (this.draggedEvent.type === 'resize-left') {
-        event.startDate = snapToStartOfMonth(event.startDate);
+        updates.startDate = snapToStartOfMonth(event.startDate);
       }
 
       if (this.draggedEvent.type === 'resize-right' && event.endDate !== null) {
-        event.endDate = snapToEndOfMonth(event.endDate);
+        updates.endDate = snapToEndOfMonth(event.endDate);
       }
 
-      if (event.endDate !== null && event.startDate >= event.endDate) {
-        event.endDate = snapToEndOfMonth(event.startDate);
+      // Ensure end date is after start date
+      const newStartDate = updates.startDate || event.startDate;
+      const newEndDate = updates.endDate || event.endDate;
+      
+      if (newEndDate !== null && newStartDate >= newEndDate) {
+        updates.endDate = snapToEndOfMonth(newStartDate);
+      }
+
+      // Apply updates
+      if (Object.keys(updates).length > 0) {
+        this.eventStateProvider.updateEvent(event.id, updates);
       }
 
       const { wrapper, eventEl } = this.eventRenderer.findEventElements(
         this.draggedEvent.id,
       );
       if (wrapper && eventEl) {
-        this.eventRenderer.updateEventPosition(wrapper, eventEl, event);
+        const updatedEvent = this.eventStateProvider.getEventById(this.draggedEvent.id);
+        if (updatedEvent) {
+          this.eventRenderer.updateEventPosition(wrapper, eventEl, updatedEvent);
+        }
       }
     }
 
@@ -321,8 +334,16 @@ export class EventInteractionHandler {
     ) as HTMLElement;
     wrapper?.classList.remove('reordering');
 
-    // Update events array to match DOM order
-    this.updateEventsOrderFromDOM();
+    // Get ordered IDs from DOM
+    const wrappers = Array.from(
+      this.eventsContainer.querySelectorAll('.timeline-event-wrapper'),
+    ) as HTMLElement[];
+    const orderedIds = wrappers
+      .map((w) => parseInt(w.dataset.id || '0', 10))
+      .filter((id) => id > 0);
+
+    // Update events array through state provider
+    this.eventStateProvider.reorderEventsFromDOM(orderedIds);
   }
 
   private handleDocumentClick(e: MouseEvent): void {
@@ -342,9 +363,4 @@ export class EventInteractionHandler {
       this.selectedEventId = null;
     }
   }
-
-  // These methods need to be provided by the parent
-  private getEvents: () => TimelineEvent[] = () => [];
-
-  private updateEventsOrderFromDOM: () => void = () => {};
 }
