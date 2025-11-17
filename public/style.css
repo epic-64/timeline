@@ -215,6 +215,7 @@ button:hover {
     display: none;
 }
 
+/*noinspection CssUnresolvedCustomProperty*/
 .timeline-event {
     position: relative;
     height: 45px;
@@ -239,6 +240,7 @@ button:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+/*noinspection CssUnresolvedCustomProperty*/
 .timeline-event.open-ended {
     background: linear-gradient(to right,
         rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.3) 0%,
@@ -248,6 +250,7 @@ button:hover {
     border-right: 2px dashed rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.5);
 }
 
+/*noinspection CssUnresolvedCustomProperty*/
 .timeline-event.open-ended:hover {
     background: linear-gradient(to right,
         rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.5) 0%,
@@ -256,10 +259,12 @@ button:hover {
         rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0) 100%);
 }
 
+/*noinspection CssUnresolvedCustomProperty*/
 .timeline-event:hover {
     background-color: rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.5);
 }
 
+/*noinspection CssUnresolvedCustomProperty*/
 .timeline-event-wrapper.selected .timeline-event {
     border-color: rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 1);
     background-color: rgba(var(--event-color-r, 1), var(--event-color-g, 126), var(--event-color-b, 254), 0.5);
