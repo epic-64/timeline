@@ -1,19 +1,13 @@
-//TIP With Search Everywhere, you can find any action, file, or symbol in your project. Press <shortcut actionId="Shift"/> <shortcut actionId="Shift"/>, type in <b>terminal</b>, and press <shortcut actionId="EditorEnter"/>. Then run <shortcut raw="npm run dev"/> in the terminal and click the link in its output to open the app in the browser.
 import html2canvas from 'html2canvas';
-
-interface Break {
-  startDate: Date;
-  endDate: Date;
-}
-
-interface TimelineEvent {
-  id: number;
-  name: string;
-  startDate: Date;
-  endDate: Date | null;
-  color: string;
-  breaks: Break[];
-}
+import { TimelineEvent } from './types';
+import {
+  timeToZoomedPosition,
+  zoomedPositionToTime,
+  formatDateRange,
+  calculateDuration,
+  snapToStartOfMonth,
+  snapToEndOfMonth
+} from './dateUtils';
 
 class Timeline {
   private events: TimelineEvent[] = [];
@@ -134,52 +128,6 @@ class Timeline {
     });
   }
 
-  /**
-   * Converts a timestamp to a non-linear position (0-1) with zoom factor applied.
-   * Recent dates get more space, older dates get compressed.
-   */
-  private timeToZoomedPosition(timestamp: number): number {
-    const timelineSpan = this.timelineEnd.getTime() - this.timelineStart.getTime();
-    const offset = timestamp - this.timelineStart.getTime();
-    const linearPosition = offset / timelineSpan; // 0 to 1
-
-    if (this.zoomFactor === 0) {
-      return linearPosition; // No zoom, linear
-    }
-
-    // Use logarithmic scale for smoother compression
-    // Invert the position so recent dates expand and old dates compress
-    const scale = this.zoomFactor * 10; // Amplify the effect
-    const inverted = 1 - linearPosition; // Invert: 0 becomes 1, 1 becomes 0
-    const shifted = inverted * scale + 1; // Shift to avoid log(0)
-    const logMax = Math.log(scale + 1);
-    const logResult = Math.log(shifted) / logMax;
-
-    return 1 - logResult; // Invert back
-  }
-
-  /**
-   * Converts a zoomed position (0-1) back to a timestamp.
-   * Used for reverse mapping during dragging operations.
-   */
-  private zoomedPositionToTime(zoomedPosition: number): number {
-    const timelineSpan = this.timelineEnd.getTime() - this.timelineStart.getTime();
-
-    if (this.zoomFactor === 0) {
-      return this.timelineStart.getTime() + zoomedPosition * timelineSpan;
-    }
-
-    // Reverse the logarithmic zoom
-    const scale = this.zoomFactor * 10;
-    const logMax = Math.log(scale + 1);
-    const inverted = 1 - zoomedPosition; // Invert
-    const shifted = Math.exp(inverted * logMax);
-    const invertedLinear = (shifted - 1) / scale;
-    const linearPosition = 1 - invertedLinear; // Invert back
-
-    return this.timelineStart.getTime() + linearPosition * timelineSpan;
-  }
-
   private renderDateHeader() {
     this.datesContainer.innerHTML = '';
     const startYear = this.timelineStart.getFullYear();
@@ -188,7 +136,12 @@ class Timeline {
     // Create markers for each year with zoomed positioning
     for (let year = startYear; year <= endYear; year++) {
       const yearDate = new Date(year, 0, 1); // January 1st of each year
-      const zoomedPos = this.timeToZoomedPosition(yearDate.getTime());
+      const zoomedPos = timeToZoomedPosition(
+        yearDate.getTime(),
+        this.timelineStart,
+        this.timelineEnd,
+        this.zoomFactor
+      );
 
       const dateEl = document.createElement('div');
       dateEl.className = 'timeline-date';
@@ -232,8 +185,8 @@ class Timeline {
     // External date label (for short events)
     const externalDatesEl = document.createElement('span');
     externalDatesEl.className = 'timeline-event-dates-external';
-    const dateRangeText = this.formatDateRange(event.startDate, event.endDate);
-    const durationText = this.calculateDuration(event.startDate, event.endDate);
+    const dateRangeText = formatDateRange(event.startDate, event.endDate);
+    const durationText = calculateDuration(event.startDate, event.endDate);
     externalDatesEl.innerHTML = `${dateRangeText}<br><span class="duration">${durationText}</span>`;
 
     const eventEl = document.createElement('div');
@@ -395,8 +348,18 @@ class Timeline {
     const effectiveEndDate = event.endDate || new Date();
 
     // Calculate zoomed positions
-    const startZoomedPos = this.timeToZoomedPosition(event.startDate.getTime());
-    const endZoomedPos = this.timeToZoomedPosition(effectiveEndDate.getTime());
+    const startZoomedPos = timeToZoomedPosition(
+      event.startDate.getTime(),
+      this.timelineStart,
+      this.timelineEnd,
+      this.zoomFactor
+    );
+    const endZoomedPos = timeToZoomedPosition(
+      effectiveEndDate.getTime(),
+      this.timelineStart,
+      this.timelineEnd,
+      this.zoomFactor
+    );
 
     const leftPercent = startZoomedPos * 100;
     const widthPercent = (endZoomedPos - startZoomedPos) * 100;
@@ -432,8 +395,8 @@ class Timeline {
     // Update both date displays
     const datesEl = eventEl.querySelector('.timeline-event-dates');
     const externalDatesEl = wrapper.querySelector('.timeline-event-dates-external');
-    const dateText = this.formatDateRange(event.startDate, event.endDate);
-    const durationText = this.calculateDuration(event.startDate, event.endDate, event.breaks);
+    const dateText = formatDateRange(event.startDate, event.endDate);
+    const durationText = calculateDuration(event.startDate, event.endDate, event.breaks);
     const fullText = `${dateText}<br><span class="duration">${durationText}</span>`;
 
     if (datesEl) {
@@ -444,74 +407,6 @@ class Timeline {
     }
   }
 
-  private formatDateRange(start: Date, end: Date | null): string {
-    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    if (end === null) {
-      return `${startStr} - Present`;
-    }
-    const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `${startStr} - ${endStr}`;
-  }
-
-  private calculateDuration(start: Date, end: Date | null, breaks: Break[] = []): string {
-    const effectiveEnd = end || new Date();
-
-    // Calculate total duration in milliseconds
-    let totalMs = effectiveEnd.getTime() - start.getTime();
-
-    // Subtract break durations
-    for (const breakPeriod of breaks) {
-      const breakStart = new Date(breakPeriod.startDate);
-      const breakEnd = new Date(breakPeriod.endDate);
-
-      // Only count breaks that are within the event period
-      if (breakStart < effectiveEnd && breakEnd > start) {
-        const effectiveBreakStart = breakStart < start ? start : breakStart;
-        const effectiveBreakEnd = breakEnd > effectiveEnd ? effectiveEnd : breakEnd;
-        const breakDuration = effectiveBreakEnd.getTime() - effectiveBreakStart.getTime();
-        totalMs -= breakDuration;
-      }
-    }
-
-    // Convert milliseconds to months
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const msPerMonth = msPerDay * 30.44; // Average days per month
-    const totalMonths = Math.floor(totalMs / msPerMonth);
-
-    const years = Math.floor(totalMonths / 12);
-    const months = totalMonths % 12;
-
-    // Format the output
-    const parts: string[] = [];
-    if (years > 0) {
-      parts.push(`${years} ${years === 1 ? 'year' : 'years'}`);
-    }
-    if (months > 0) {
-      parts.push(`${months} ${months === 1 ? 'month' : 'months'}`);
-    }
-
-    if (parts.length === 0) {
-      return 'Less than 1 month';
-    }
-
-    return parts.join(', ');
-  }
-
-  private snapToStartOfMonth(date: Date): Date {
-    const snapped = new Date(date);
-    snapped.setDate(1);
-    snapped.setHours(0, 0, 0, 0);
-    return snapped;
-  }
-
-  private snapToEndOfMonth(date: Date): Date {
-    const snapped = new Date(date);
-    // Go to next month, then back one day
-    snapped.setMonth(snapped.getMonth() + 1);
-    snapped.setDate(0);
-    snapped.setHours(23, 59, 59, 999);
-    return snapped;
-  }
 
   private startVerticalReorder(e: MouseEvent, id: number) {
     const target = e.target as HTMLElement;
@@ -557,16 +452,19 @@ class Timeline {
     const containerWidth = this.eventsContainer.offsetWidth;
 
     // Calculate current zoomed position and new zoomed position
-    const currentZoomedPos = this.timeToZoomedPosition(
+    const currentZoomedPos = timeToZoomedPosition(
       this.draggedEvent.type === 'resize-left' ? event.startDate.getTime() :
-      event.endDate ? event.endDate.getTime() : event.startDate.getTime()
+      event.endDate ? event.endDate.getTime() : event.startDate.getTime(),
+      this.timelineStart,
+      this.timelineEnd,
+      this.zoomFactor
     );
 
     const deltaZoomedPos = deltaX / containerWidth;
     const newZoomedPos = currentZoomedPos + deltaZoomedPos;
 
     // Convert back to timestamp
-    const newTimestamp = this.zoomedPositionToTime(newZoomedPos);
+    const newTimestamp = zoomedPositionToTime(newZoomedPos, this.timelineStart, this.timelineEnd, this.zoomFactor);
 
     if (this.draggedEvent.type === 'resize-left') {
       const newStart = new Date(newTimestamp);
@@ -616,18 +514,18 @@ class Timeline {
       // Apply snapping based on resize type
       if (this.draggedEvent.type === 'resize-left') {
         // Snap start date to beginning of month
-        event.startDate = this.snapToStartOfMonth(event.startDate);
+        event.startDate = snapToStartOfMonth(event.startDate);
       }
 
       if (this.draggedEvent.type === 'resize-right' && event.endDate !== null) {
         // Snap end date to end of month (only if end date exists)
-        event.endDate = this.snapToEndOfMonth(event.endDate);
+        event.endDate = snapToEndOfMonth(event.endDate);
       }
 
       // Ensure start is before end after snapping (only if end date exists)
       if (event.endDate !== null && event.startDate >= event.endDate) {
         // If snapping caused overlap, adjust end date to end of start date's month
-        event.endDate = this.snapToEndOfMonth(event.startDate);
+        event.endDate = snapToEndOfMonth(event.startDate);
       }
 
       // Update the visual position after snapping
@@ -680,7 +578,7 @@ class Timeline {
 
     if (event.endDate === null) {
       // Set end date to end of current month
-      event.endDate = this.snapToEndOfMonth(new Date());
+      event.endDate = snapToEndOfMonth(new Date());
     } else {
       // Clear end date
       event.endDate = null;
@@ -820,7 +718,7 @@ class Timeline {
         breakEl.style.left = `${leftPercent}%`;
         breakEl.style.width = `${widthPercent}%`;
         breakEl.title = `Break: ${new Date(breakPeriod.startDate).toLocaleDateString()} - ${new Date(breakPeriod.endDate).toLocaleDateString()}`;
-
+        
         eventEl.appendChild(breakEl);
       }
     });
@@ -848,7 +746,7 @@ class Timeline {
 
     const renderBreaksList = () => {
       breaksList.innerHTML = '';
-
+      
       if (event.breaks.length === 0) {
         const emptyMsg = document.createElement('p');
         emptyMsg.className = 'empty-message';
@@ -861,14 +759,14 @@ class Timeline {
 
           const breakInfo = document.createElement('div');
           breakInfo.className = 'break-info';
-
-          const startStr = new Date(breakPeriod.startDate).toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', year: 'numeric'
+          
+          const startStr = new Date(breakPeriod.startDate).toLocaleDateString('en-US', { 
+            month: 'short', day: 'numeric', year: 'numeric' 
           });
-          const endStr = new Date(breakPeriod.endDate).toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', year: 'numeric'
+          const endStr = new Date(breakPeriod.endDate).toLocaleDateString('en-US', { 
+            month: 'short', day: 'numeric', year: 'numeric' 
           });
-
+          
           breakInfo.textContent = `${startStr} - ${endStr}`;
 
           const deleteBtn = document.createElement('button');
@@ -940,10 +838,10 @@ class Timeline {
       }
 
       event.breaks.push({ startDate: start, endDate: end });
-
+      
       // Sort breaks by start date
       event.breaks.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-
+      
       renderBreaksList();
       this.updateEventAfterBreaksChange(id);
 
@@ -1265,8 +1163,3 @@ class Timeline {
 
 // Initialize the timeline
 new Timeline();
-
-//TIP To find text strings in your project, you can use the <shortcut actionId="FindInPath"/> shortcut. Press it and type in <b>counter</b> – you’ll get all matches in one place.
-//setupCounter(document.getElementById('counter-value') as HTMLElement);
-
-//TIP There's much more in WebStorm to help you be more productive. Press <shortcut actionId="Shift"/> <shortcut actionId="Shift"/> and search for <b>Learn WebStorm</b> to open our learning hub with more things for you to try.
